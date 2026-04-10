@@ -1,0 +1,11 @@
+#!/bin/bash
+DEVECO_STUDIO="/Applications/DevEco-Studio.app"
+NODE="$DEVECO_STUDIO/Contents/tools/node/bin/node"
+HVIGOR_JS="$DEVECO_STUDIO/Contents/tools/hvigor/hvigor-ohos-plugin/node_modules/.bin/hvigorw.js"
+
+if [ ! -f "$HVIGOR_JS" ]; then
+  # Fallback: use hvigor CLI directly
+  HVIGOR_JS="$DEVECO_STUDIO/Contents/tools/hvigor/bin/hvigorw"
+fi
+
+exec "$NODE" "$HVIGOR_JS" "$@"

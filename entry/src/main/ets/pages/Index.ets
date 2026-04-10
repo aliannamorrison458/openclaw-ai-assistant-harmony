@@ -1,0 +1,283 @@
+// Index.ets — 聊天主页面（对齐 iOS ChatView）
+import { ChatViewModel } from '../viewmodel/ChatViewModel';
+import { MessageBubble } from '../components/MessageBubble';
+import { ChatMessage, SendStatus } from '../common/ChatTypes';
+
+@Entry
+@Component
+struct Index {
+  @State viewModel: ChatViewModel = new ChatViewModel();
+  @State inputText: string = '';
+  @State showOfflineBanner: boolean = false;
+  @State quotingMessage: ChatMessage | null = null;
+  @State showContextMenu: boolean = false;
+  @State contextMenuMessage: ChatMessage | null = null;
+
+  aboutToAppear() {
+    this.viewModel.onUpdate(() => {
+      // Trigger re-render by updating state
+      this.showOfflineBanner = this.viewModel.isOffline;
+    });
+  }
+
+  build() {
+    Column() {
+      // Navigation bar
+      Row() {
+        Text('AI 助手')
+          .fontSize(20)
+          .fontWeight(FontWeight.Bold)
+          .fontColor('#1A1A1A')
+
+        Blank()
+
+        // Network status indicator
+        if (this.showOfflineBanner) {
+          Text('离线')
+            .fontSize(12)
+            .fontColor('#FFFFFF')
+            .backgroundColor('#FF9800')
+            .padding({ top: 2, bottom: 2, left: 8, right: 8 })
+            .borderRadius(10)
+        }
+
+        // Settings button
+        Text('⚙️')
+          .fontSize(22)
+          .margin({ left: 12 })
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/SettingsPage' });
+          })
+      }
+      .width('100%')
+      .height(56)
+      .padding({ left: 16, right: 16 })
+      .backgroundColor('#FFFFFF')
+      .shadow({ radius: 2, color: 'rgba(0,0,0,0.08)', offsetY: 1 })
+
+      // Offline banner
+      if (this.showOfflineBanner) {
+        Row() {
+          Text('📶')
+            .fontSize(14)
+          Text('网络已断开，消息将暂停发送')
+            .fontSize(13)
+            .fontColor('#FFFFFF')
+            .margin({ left: 6 })
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .padding({ top: 6, bottom: 6 })
+        .backgroundColor('#FF9800')
+        .animation({ duration: 250, curve: Curve.EaseInOut })
+      }
+
+      // Message list
+      List({ space: 8 }) {
+        ForEach(this.viewModel.messages, (msg: ChatMessage) => {
+          ListItem() {
+            MessageBubble({
+              message: msg,
+              onRetry: () => this.viewModel.retry(msg.id),
+              onLongPress: (m: ChatMessage) => {
+                this.contextMenuMessage = m;
+                this.showContextMenu = true;
+              }
+            })
+          }
+        }, (msg: ChatMessage) => msg.id)
+      }
+      .width('100%')
+      .layoutWeight(1)
+      .padding({ left: 12, right: 12, top: 8 })
+      .scrollBar(BarState.Off)
+      .onScrollIndex((start: number, end: number) => {
+        // Auto-scroll handled by List
+      })
+
+      // Quoting preview bar
+      if (this.quotingMessage) {
+        Row() {
+          Rectangle()
+            .width(3)
+            .height('100%')
+            .color('#4A90D9')
+
+          Column() {
+            Text(this.quotingMessage.isUser ? '回复自己' : '回复助手')
+              .fontSize(12)
+              .fontWeight(FontWeight.Bold)
+              .fontColor('#4A90D9')
+            Text(this.quotingMessage.text)
+              .fontSize(12)
+              .fontColor('#888888')
+              .maxLines(2)
+              .textOverflow({ overflow: TextOverflow.Ellipsis })
+          }
+          .layoutWeight(1)
+          .margin({ left: 8 })
+
+          Text('✕')
+            .fontSize(16)
+            .fontColor('#999999')
+            .onClick(() => this.quotingMessage = null)
+        }
+        .width('100%')
+        .height(48)
+        .padding({ left: 12, right: 12 })
+        .backgroundColor('#F5F5F5')
+      }
+
+      // Input area
+      Row() {
+        TextInput({ text: this.inputText, placeholder: '输入消息...' })
+          .layoutWeight(1)
+          .height(40)
+          .fontSize(15)
+          .padding({ left: 12, right: 12 })
+          .backgroundColor('#F5F5F5')
+          .borderRadius(20)
+          .onChange((value: string) => this.inputText = value)
+          .onSubmit(() => this.sendMessage())
+
+        Button('发送')
+          .width(60)
+          .height(40)
+          .fontSize(15)
+          .fontColor('#FFFFFF')
+          .backgroundColor(this.viewModel.canSend && this.inputText.trim() ? '#4A90D9' : '#CCCCCC')
+          .borderRadius(20)
+          .margin({ left: 8 })
+          .enabled(this.viewModel.canSend && this.inputText.trim().length > 0)
+          .onClick(() => this.sendMessage())
+      }
+      .width('100%')
+      .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+      .backgroundColor('#FFFFFF')
+    }
+    .width('100%')
+    .height('100%')
+    .backgroundColor('#FAFAFA')
+
+    // Context menu overlay
+    if (this.showContextMenu && this.contextMenuMessage) {
+      this.buildContextMenu()
+    }
+  }
+
+  @Builder
+  buildContextMenu() {
+    Column() {
+      // Backdrop
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(0,0,0,0.3)')
+        .onClick(() => this.showContextMenu = false)
+
+      // Menu items
+      Column() {
+        if (this.contextMenuMessage?.isUser) {
+          Text('复制')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.copyText(this.contextMenuMessage!.text);
+              this.showContextMenu = false;
+            })
+
+          Divider()
+
+          Text('引用回复')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.quotingMessage = this.contextMenuMessage;
+              this.showContextMenu = false;
+            })
+
+          Divider()
+
+          if (this.contextMenuMessage?.sendStatus === SendStatus.FAILED) {
+            Text('重新发送')
+              .fontSize(16)
+              .width('100%')
+              .textAlign(TextAlign.Center)
+              .fontColor('#4A90D9')
+              .padding({ top: 14, bottom: 14 })
+              .onClick(() => {
+                this.viewModel.retry(this.contextMenuMessage!.id);
+                this.showContextMenu = false;
+              })
+            Divider()
+          }
+
+          Text('删除')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .fontColor('#FF4444')
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.viewModel.deleteMessage(this.contextMenuMessage!.id);
+              this.showContextMenu = false;
+            })
+        } else {
+          // Assistant message
+          Text('复制')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.copyText(this.contextMenuMessage!.text);
+              this.showContextMenu = false;
+            })
+
+          Divider()
+
+          Text('引用回复')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.quotingMessage = this.contextMenuMessage;
+              this.showContextMenu = false;
+            })
+        }
+      }
+      .width('70%')
+      .backgroundColor('#FFFFFF')
+      .borderRadius(12)
+    }
+    .width('100%')
+    .height('100%')
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
+  private sendMessage(): void {
+    if (!this.inputText.trim()) return;
+
+    const quotedId = this.quotingMessage?.id;
+    const quotedText = this.quotingMessage?.text;
+    this.viewModel.send(this.inputText, quotedId, quotedText);
+    this.inputText = '';
+    this.quotingMessage = null;
+  }
+
+  private copyText(text: string): void {
+    // ArkTS clipboard API
+    import { systemPasteboard } from '@kit.BasicServicesKit';
+    systemPasteboard.setData(systemPasteboard.MIMETYPE_TEXT_PLAINTEXT, text, (err) => {
+      if (err) {
+        console.error('Copy failed:', JSON.stringify(err));
+      }
+    });
+  }
+}

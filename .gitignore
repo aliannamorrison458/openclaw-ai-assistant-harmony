@@ -1,0 +1,9 @@
+.idea/
+build/
+.hvigor/
+.local/
+node_modules/
+*.iml
+oh_modules/
+.preview/
+local.properties

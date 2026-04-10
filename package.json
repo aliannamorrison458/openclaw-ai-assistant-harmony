@@ -1,0 +1,13 @@
+{
+  "name": "aihelper",
+  "version": "1.0.0",
+  "ohos": {
+    "org": "huawei",
+    "buildTool": "hvigor",
+    "directoryLevel": "project"
+  },
+  "description": "AI Assistant - HarmonyOS NEXT",
+  "repository": {},
+  "license": "Apache-2.0",
+  "dependencies": {}
+}

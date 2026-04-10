@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "AI 助手"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "AI 助手主界面"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "AI助手"
+    }
+  ]
+}
