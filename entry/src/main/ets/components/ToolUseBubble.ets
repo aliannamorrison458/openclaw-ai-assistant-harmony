@@ -1,25 +1,18 @@
-// ToolUseBubble.ets — 工具调用展示组件（可折叠/展开）
+// ToolUseBubble.ets — 工具调用展示组件（可折叠/展开 + 深色模式）
 import { ToolUseData, MessageType } from '../common/ChatTypes';
+import { tc } from '../common/DarkModeManager';
 
 @Component
 export struct ToolUseBubble {
   toolData: ToolUseData = {} as ToolUseData;
   messageType: MessageType = MessageType.TOOL_USE;
 
-  // i18n string props
-  statusExecuting: string = '执行中...';
-  statusCompleted: string = '已完成';
-  statusError: string = '执行出错';
-  paramsLabel: string = '📋 参数';
-  resultLabel: string = '📝 执行结果';
-  errorResultLabel: string = '❌ 错误结果';
-  moreItemsSuffix: string = '个';
-
   @State expanded: boolean = false;
 
   // 格式化 JSON 参数（带缩进 + 截断）
   private formatParams(json: string): string {
     try {
+      // 尝试格式化 JSON
       const obj = JSON.parse(json);
       const formatted = JSON.stringify(obj, null, 2);
       if (formatted.length > 300) {
@@ -54,9 +47,9 @@ export struct ToolUseBubble {
   // 状态文案
   private getStatusText(): string {
     switch (this.toolData.status) {
-      case 'running': return this.statusExecuting;
-      case 'completed': return this.statusCompleted;
-      case 'error': return this.statusError;
+      case 'running': return '执行中...';
+      case 'completed': return '已完成';
+      case 'error': return '执行出错';
       default: return '';
     }
   }
@@ -64,10 +57,10 @@ export struct ToolUseBubble {
   // 状态颜色
   private getStatusColor(): string {
     switch (this.toolData.status) {
-      case 'running': return '#FF9800';
-      case 'completed': return '#4CAF50';
-      case 'error': return '#F44336';
-      default: return '#999999';
+      case 'running': return tc('color_warning');
+      case 'completed': return tc('color_success');
+      case 'error': return tc('color_error');
+      default: return tc('color_text_tertiary');
     }
   }
 
@@ -92,7 +85,7 @@ export struct ToolUseBubble {
           : JSON.stringify(obj[key]);
         previews.push(`${key}: ${val}`);
       }
-      if (keys.length > 3) previews.push(`...+${keys.length - 3}${this.moreItemsSuffix}`);
+      if (keys.length > 3) previews.push(`...+${keys.length - 3}个`);
       return previews.join(', ');
     } catch (e) {
       if (this.toolData.paramsJson.length > 80) {
@@ -129,7 +122,7 @@ export struct ToolUseBubble {
             Text(this.toolData.toolName)
               .fontSize(14)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#1A1A1A')
+              .fontColor(tc('color_text_primary'))
 
             // 状态标签
             Text(this.getStatusText())
@@ -146,7 +139,7 @@ export struct ToolUseBubble {
             // 参数预览
             Text(this.getParamPreview())
               .fontSize(12)
-              .fontColor('#888888')
+              .fontColor(tc('color_text_quaternary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .margin({ top: 2 })
@@ -156,7 +149,7 @@ export struct ToolUseBubble {
           if (!this.expanded && this.toolData.resultSummary) {
             Text(this.truncateSummary(this.toolData.resultSummary, 60))
               .fontSize(12)
-              .fontColor('#666666')
+              .fontColor(tc('color_text_secondary'))
               .maxLines(1)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
               .margin({ top: 2 })
@@ -167,7 +160,7 @@ export struct ToolUseBubble {
         // 展开/折叠箭头
         Text(this.expanded ? '▲' : '▼')
           .fontSize(12)
-          .fontColor('#999999')
+          .fontColor(tc('color_text_tertiary'))
           .margin({ left: 8 })
       }
       .width('100%')
@@ -180,10 +173,10 @@ export struct ToolUseBubble {
       if (this.expanded) {
         // 参数详情
         Column() {
-          Text(this.paramsLabel)
+          Text('📋 参数')
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
-            .fontColor('#666666')
+            .fontColor(tc('color_text_secondary'))
             .margin({ bottom: 6 })
 
           Column() {
@@ -192,11 +185,11 @@ export struct ToolUseBubble {
                 Text(entry.key + ':')
                   .fontSize(12)
                   .fontWeight(FontWeight.Medium)
-                  .fontColor('#888888')
+                  .fontColor(tc('color_tool_key'))
                   .margin({ right: 6 })
                 Text(entry.value)
                   .fontSize(12)
-                  .fontColor('#333333')
+                  .fontColor(tc('color_tool_value'))
                   .maxLines(3)
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .layoutWeight(1)
@@ -207,7 +200,7 @@ export struct ToolUseBubble {
           }
           .width('100%')
           .padding({ left: 8, right: 8, top: 8, bottom: 8 })
-          .backgroundColor('#F8F9FA')
+          .backgroundColor(tc('color_tool_params_bg'))
           .borderRadius(6)
         }
         .width('100%')
@@ -216,22 +209,22 @@ export struct ToolUseBubble {
         // 结果详情
         if (this.toolData.resultSummary) {
           Column() {
-            Text(this.toolData.status === 'error' ? this.errorResultLabel : this.resultLabel)
+            Text(this.toolData.status === 'error' ? '❌ 错误结果' : '📝 执行结果')
               .fontSize(12)
               .fontWeight(FontWeight.Bold)
-              .fontColor(this.toolData.status === 'error' ? '#F44336' : '#666666')
+              .fontColor(this.toolData.status === 'error' ? tc('color_tool_result_error_label') : tc('color_tool_result_label'))
               .margin({ bottom: 6 })
 
             Text(this.toolData.resultSummary)
               .fontSize(12)
-              .fontColor('#333333')
+              .fontColor(tc('color_tool_value'))
               .width('100%')
               .padding({ left: 8, right: 8, top: 8, bottom: 8 })
-              .backgroundColor(this.toolData.status === 'error' ? '#FFF5F5' : '#F8F9FA')
+              .backgroundColor(this.toolData.status === 'error' ? tc('color_tool_error_bg') : tc('color_tool_params_bg'))
               .borderRadius(6)
               .border({
                 width: 1,
-                color: this.toolData.status === 'error' ? '#FFCDD2' : '#E8E8E8'
+                color: this.toolData.status === 'error' ? tc('color_tool_error_border') : tc('color_tool_border')
               })
           }
           .width('100%')
@@ -243,7 +236,7 @@ export struct ToolUseBubble {
           Row() {
             Text('⏱️ ' + this.getDuration())
               .fontSize(11)
-              .fontColor('#999999')
+              .fontColor(tc('color_text_tertiary'))
           }
           .width('100%')
           .padding({ left: 12, right: 12, bottom: 8 })
@@ -252,12 +245,12 @@ export struct ToolUseBubble {
     }
     .width('80%')
     .backgroundColor(this.messageType === MessageType.TOOL_RESULT && this.toolData.status === 'error'
-      ? '#FFF5F5' : '#F8F8F8')
+      ? tc('color_tool_error_bg') : tc('color_tool_bg'))
     .borderRadius(12)
     .border({
       width: 1,
       color: this.messageType === MessageType.TOOL_RESULT && this.toolData.status === 'error'
-        ? '#FFCDD2' : '#E8E8E8'
+        ? tc('color_tool_error_border') : tc('color_tool_border')
     })
     .margin({
       left: 0,

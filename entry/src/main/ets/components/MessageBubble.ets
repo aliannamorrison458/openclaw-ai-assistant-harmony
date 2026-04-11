@@ -8,6 +8,10 @@ export struct MessageBubble {
   onRetry: () => void = () => {};
   onLongPress: (msg: ChatMessage) => void = () => {};
   onSpeak: (text: string) => void = () => {};
+  quoteAssistantLabel: string = '回复助手';
+  quoteYouLabel: string = '回复你';
+  retryLabel: string = '重试';
+  offlineLabel: string = '离线';
 
   private formatTime(timestamp: number): string {
     const date = new Date(timestamp);
@@ -56,7 +60,7 @@ export struct MessageBubble {
         Column() {
           // Quoted label
           if (this.message.quotedText) {
-            Text(this.message.isUser ? '回复助手' : '回复你')
+            Text(this.message.isUser ? this.quoteAssistantLabel : this.quoteYouLabel)
               .fontSize(11)
               .fontColor(tc('color_accent'))
               .fontWeight(FontWeight.Bold)
@@ -81,7 +85,7 @@ export struct MessageBubble {
 
               // Retry button for failed messages
               if (this.message.sendStatus === SendStatus.FAILED) {
-                Text('重试')
+                Text(this.retryLabel)
                   .fontSize(11)
                   .fontColor(tc('color_error'))
                   .margin({ left: 8 })
@@ -90,7 +94,7 @@ export struct MessageBubble {
             }
 
             if (this.message.isDegraded) {
-              Text('离线')
+              Text(this.offlineLabel)
                 .fontSize(10)
                 .fontColor(tc('color_warning'))
                 .margin({ left: 4 })

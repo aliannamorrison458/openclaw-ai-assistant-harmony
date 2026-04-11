@@ -1,8 +1,9 @@
-// Index.ets — 聊天主页面（集成语音输入和播报功能）
+// Index.ets — 聊天主页面（集成语音输入和播报功能 + 深色模式）
 import { ChatViewModel } from '../viewmodel/ChatViewModel';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
 import { VoiceState } from '../service/VoiceServiceManager';
+import { DarkModeSetting, tc } from '../common/DarkModeManager';
 
 @Entry
 @Component
@@ -13,6 +14,7 @@ struct Index {
   @State quotingMessage: ChatMessage | null = null;
   @State showContextMenu: boolean = false;
   @State contextMenuMessage: ChatMessage | null = null;
+  @StorageProp('darkModeSetting') darkMode: DarkModeSetting = 'system';
 
   aboutToAppear() {
     this.viewModel.onUpdate(() => {
@@ -29,7 +31,7 @@ struct Index {
         Text($r('app.string.nav_title'))
           .fontSize(20)
           .fontWeight(FontWeight.Bold)
-          .fontColor('#1A1A1A')
+          .fontColor(tc('color_text_primary'))
 
         Blank()
 
@@ -37,14 +39,14 @@ struct Index {
         if (this.showOfflineBanner) {
           Text($r('app.string.offline_badge'))
             .fontSize(12)
-            .fontColor('#FFFFFF')
-            .backgroundColor('#FF9800')
+            .fontColor(tc('color_text_on_accent'))
+            .backgroundColor(tc('color_warning'))
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
         } else if (this.viewModel.isWeakNetwork) {
           Text($r('app.string.weak_network_badge'))
             .fontSize(12)
-            .fontColor('#FFFFFF')
+            .fontColor(tc('color_text_on_accent'))
             .backgroundColor('#FFC107')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
@@ -61,8 +63,8 @@ struct Index {
       .width('100%')
       .height(56)
       .padding({ left: 16, right: 16 })
-      .backgroundColor('#FFFFFF')
-      .shadow({ radius: 2, color: 'rgba(0,0,0,0.08)', offsetY: 1 })
+      .backgroundColor(tc('color_surface'))
+      .shadow({ radius: 2, color: tc('color_shadow'), offsetY: 1 })
 
       // Offline banner
       if (this.showOfflineBanner) {
@@ -71,13 +73,13 @@ struct Index {
             .fontSize(14)
           Text($r('app.string.offline_banner'))
             .fontSize(13)
-            .fontColor('#FFFFFF')
+            .fontColor(tc('color_text_on_accent'))
             .margin({ left: 6 })
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
         .padding({ top: 6, bottom: 6 })
-        .backgroundColor('#FF9800')
+        .backgroundColor(tc('color_warning'))
         .animation({ duration: 250, curve: Curve.EaseInOut })
       }
 
@@ -86,12 +88,12 @@ struct Index {
         Row() {
           Text(this.viewModel.voiceOfflineWarning)
             .fontSize(13)
-            .fontColor('#FFFFFF')
+            .fontColor(tc('color_text_on_accent'))
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
         .padding({ top: 6, bottom: 6 })
-        .backgroundColor('#F44336')
+        .backgroundColor(tc('color_error'))
         .animation({ duration: 250, curve: Curve.EaseInOut })
       }
 
@@ -109,7 +111,7 @@ struct Index {
             LoadingProgress()
               .width(16)
               .height(16)
-              .color('#4A90D9')
+              .color(tc('color_voice_indicator_text'))
           } else if (this.viewModel.isVoicePlaying) {
             // Playing indicator: speaker
             Text('🔊')
@@ -118,14 +120,14 @@ struct Index {
 
           Text(this.getVoiceStateText())
             .fontSize(13)
-            .fontColor('#4A90D9')
+            .fontColor(tc('color_voice_indicator_text'))
             .margin({ left: 8 })
             .fontWeight(FontWeight.Medium)
         }
         .width('100%')
         .justifyContent(FlexAlign.Center)
         .padding({ top: 6, bottom: 6 })
-        .backgroundColor('#E3F2FD')
+        .backgroundColor(tc('color_voice_indicator_bg'))
         .animation({ duration: 250, curve: Curve.EaseInOut })
       }
 
@@ -162,16 +164,16 @@ struct Index {
           Rectangle()
             .width(3)
             .height('100%')
-            .color('#4A90D9')
+            .color(tc('color_quote_bar'))
 
           Column() {
             Text(this.quotingMessage.isUser ? $r('app.string.quote_self') : $r('app.string.quote_assistant'))
               .fontSize(12)
               .fontWeight(FontWeight.Bold)
-              .fontColor('#4A90D9')
+              .fontColor(tc('color_accent'))
             Text(this.quotingMessage.text)
               .fontSize(12)
-              .fontColor('#888888')
+              .fontColor(tc('color_quote_text'))
               .maxLines(2)
               .textOverflow({ overflow: TextOverflow.Ellipsis })
           }
@@ -180,13 +182,13 @@ struct Index {
 
           Text('✕')
             .fontSize(16)
-            .fontColor('#999999')
+            .fontColor(tc('color_text_tertiary'))
             .onClick(() => this.quotingMessage = null)
         }
         .width('100%')
         .height(48)
         .padding({ left: 12, right: 12 })
-        .backgroundColor('#F5F5F5')
+        .backgroundColor(tc('color_quote_bg'))
       }
 
       // Input area
@@ -198,8 +200,10 @@ struct Index {
           .layoutWeight(1)
           .height(40)
           .fontSize(15)
+          .fontColor(tc('color_text_primary'))
+          .placeholderColor(tc('color_text_placeholder'))
           .padding({ left: 12, right: 12 })
-          .backgroundColor('#F5F5F5')
+          .backgroundColor(tc('color_surface_alt'))
           .borderRadius(20)
           .onChange((value: string) => {
             this.inputText = value;
@@ -212,8 +216,8 @@ struct Index {
           .width(60)
           .height(40)
           .fontSize(15)
-          .fontColor('#FFFFFF')
-          .backgroundColor(this.viewModel.canSend && this.inputText.trim() ? '#4A90D9' : '#CCCCCC')
+          .fontColor(tc('color_text_on_accent'))
+          .backgroundColor(this.viewModel.canSend && this.inputText.trim() ? tc('color_accent') : tc('color_accent_dim'))
           .borderRadius(20)
           .margin({ left: 8 })
           .enabled(this.viewModel.canSend && this.inputText.trim().length > 0 && this.viewModel.voiceState === VoiceState.IDLE)
@@ -221,11 +225,11 @@ struct Index {
       }
       .width('100%')
       .padding({ left: 12, right: 12, top: 8, bottom: 8 })
-      .backgroundColor('#FFFFFF')
+      .backgroundColor(tc('color_surface'))
     }
     .width('100%')
     .height('100%')
-    .backgroundColor('#FAFAFA')
+    .backgroundColor(tc('color_background'))
 
     // Context menu overlay
     if (this.showContextMenu && this.contextMenuMessage) {
@@ -251,8 +255,8 @@ struct Index {
         .width(40)
         .height(40)
         .fontSize(18)
-        .fontColor('#FFFFFF')
-        .backgroundColor('#F44336')
+        .fontColor(tc('color_text_on_accent'))
+        .backgroundColor(tc('color_error'))
         .borderRadius(20)
         .margin({ right: 8 })
         .onClick(() => {
@@ -270,11 +274,11 @@ struct Index {
         LoadingProgress()
           .width(20)
           .height(20)
-          .color('#FFFFFF')
+          .color(tc('color_text_on_accent'))
       }
       .width(40)
       .height(40)
-      .backgroundColor('#CCCCCC')
+      .backgroundColor(tc('color_accent_dim'))
       .borderRadius(20)
       .margin({ right: 8 })
       .enabled(false)
@@ -284,8 +288,8 @@ struct Index {
         .width(40)
         .height(40)
         .fontSize(18)
-        .fontColor('#FFFFFF')
-        .backgroundColor('#FF9800')
+        .fontColor(tc('color_text_on_accent'))
+        .backgroundColor(tc('color_warning'))
         .borderRadius(20)
         .margin({ right: 8 })
         .onClick(() => {
@@ -297,8 +301,8 @@ struct Index {
         .width(40)
         .height(40)
         .fontSize(18)
-        .fontColor('#FFFFFF')
-        .backgroundColor(this.viewModel.canUseVoice ? '#4A90D9' : '#CCCCCC')
+        .fontColor(tc('color_text_on_accent'))
+        .backgroundColor(this.viewModel.canUseVoice ? tc('color_accent') : tc('color_accent_dim'))
         .borderRadius(20)
         .margin({ right: 8 })
         .enabled(this.viewModel.canUseVoice)
@@ -325,6 +329,7 @@ struct Index {
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.copyText(this.contextMenuMessage!.text);
@@ -332,11 +337,13 @@ struct Index {
             })
 
           Divider()
+            .color(tc('color_divider'))
 
           Text($r('app.string.btn_quote_reply'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
@@ -344,12 +351,14 @@ struct Index {
             })
 
           Divider()
+            .color(tc('color_divider'))
 
           // 语音播报选项
           Text($r('app.string.btn_voice_playback'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.viewModel.speakText(this.contextMenuMessage!.text);
@@ -357,26 +366,28 @@ struct Index {
             })
 
           Divider()
+            .color(tc('color_divider'))
 
           if (this.contextMenuMessage?.sendStatus === SendStatus.FAILED) {
             Text($r('app.string.btn_resend'))
               .fontSize(16)
               .width('100%')
               .textAlign(TextAlign.Center)
-              .fontColor('#4A90D9')
+              .fontColor(tc('color_accent'))
               .padding({ top: 14, bottom: 14 })
               .onClick(() => {
                 this.viewModel.retry(this.contextMenuMessage!.id);
                 this.showContextMenu = false;
               })
             Divider()
+              .color(tc('color_divider'))
           }
 
           Text($r('app.string.btn_delete'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
-            .fontColor('#FF4444')
+            .fontColor(tc('color_error'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.viewModel.deleteMessage(this.contextMenuMessage!.id);
@@ -388,6 +399,7 @@ struct Index {
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.copyText(this.contextMenuMessage!.text);
@@ -395,11 +407,13 @@ struct Index {
             })
 
           Divider()
+            .color(tc('color_divider'))
 
           Text($r('app.string.btn_quote_reply'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
@@ -407,12 +421,14 @@ struct Index {
             })
 
           Divider()
+            .color(tc('color_divider'))
 
           // 语音播报选项
           Text($r('app.string.btn_voice_playback'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
+            .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.viewModel.speakText(this.contextMenuMessage!.text);
@@ -421,7 +437,7 @@ struct Index {
         }
       }
       .width('70%')
-      .backgroundColor('#FFFFFF')
+      .backgroundColor(tc('color_menu_bg'))
       .borderRadius(12)
     }
     .width('100%')

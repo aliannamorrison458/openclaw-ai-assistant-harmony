@@ -1,5 +1,6 @@
-// MarkdownRenderer.ets — 基于正则解析的 Markdown 渲染组件
+// MarkdownRenderer.ets — 基于正则解析的 Markdown 渲染组件（深色模式适配）
 // 支持：标题(#~######)、加粗(**)、斜体(*)、代码块(```)、行内代码(`)、列表(-/*/1.)、链接([text](url))
+import { tc } from '../common/DarkModeManager';
 
 interface InlineSegment {
   type: 'text' | 'bold' | 'italic' | 'inlineCode' | 'link';
@@ -14,29 +15,29 @@ function renderInlineText(segments: InlineSegment[]) {
       if (seg.type === 'text') {
         Text(seg.content)
           .fontSize(15)
-          .fontColor('#1A1A1A')
+          .fontColor(tc('color_md_text'))
       } else if (seg.type === 'bold') {
         Text(seg.content)
           .fontSize(15)
-          .fontColor('#1A1A1A')
+          .fontColor(tc('color_md_bold'))
           .fontWeight(FontWeight.Bold)
       } else if (seg.type === 'italic') {
         Text(seg.content)
           .fontSize(15)
-          .fontColor('#1A1A1A')
+          .fontColor(tc('color_md_text'))
           .fontStyle(FontStyle.Italic)
       } else if (seg.type === 'inlineCode') {
         Text(seg.content)
           .fontSize(14)
-          .fontColor('#D63384')
-          .backgroundColor('#F5F5F5')
+          .fontColor(tc('color_md_inline_code'))
+          .backgroundColor(tc('color_md_inline_code_bg'))
           .borderRadius(4)
           .padding({ left: 4, right: 4, top: 1, bottom: 1 })
       } else if (seg.type === 'link') {
         Text(seg.content)
           .fontSize(15)
-          .fontColor('#0D6EFD')
-          .decoration({ type: TextDecorationType.Underline, color: '#0D6EFD' })
+          .fontColor(tc('color_md_link'))
+          .decoration({ type: TextDecorationType.Underline, color: tc('color_md_link') })
           .onClick(() => {
             if (seg.url) {
               // 链接点击 — 使用 ArkTS openURL
@@ -157,12 +158,12 @@ function tokenizeCode(code: string, lang: string): HighlightToken[] {
 
 function highlightColor(type: string): string {
   switch (type) {
-    case 'keyword': return '#D73A49';
-    case 'string': return '#032F62';
-    case 'comment': return '#6A737D';
-    case 'number': return '#005CC5';
-    case 'punctuation': return '#24292E';
-    default: return '#24292E';
+    case 'keyword': return tc('color_code_keyword');
+    case 'string': return tc('color_code_string');
+    case 'comment': return tc('color_code_comment');
+    case 'number': return tc('color_code_number');
+    case 'punctuation': return tc('color_code_punctuation');
+    default: return tc('color_code_plain');
   }
 }
 
@@ -340,7 +341,7 @@ export struct MarkdownRenderer {
           Text(block.content)
             .fontSize(this.headingFontSize(block.level))
             .fontWeight(FontWeight.Bold)
-            .fontColor('#1A1A1A')
+            .fontColor(tc('color_md_heading'))
             .margin({ top: 12, bottom: 4 })
         } else if (block.type === 'code') {
           // 代码块带语法高亮
@@ -350,7 +351,7 @@ export struct MarkdownRenderer {
               Row() {
                 Text(block.lang)
                   .fontSize(11)
-                  .fontColor('#666666')
+                  .fontColor(tc('color_md_lang_label'))
                   .fontWeight(FontWeight.Medium)
               }
               .width('100%')
@@ -367,32 +368,32 @@ export struct MarkdownRenderer {
             .padding({ left: 12, right: 12, bottom: 10 })
           }
           .width('100%')
-          .backgroundColor('#F6F8FA')
+          .backgroundColor(tc('color_md_code_bg'))
           .borderRadius(8)
-          .border({ width: 1, color: '#E1E4E8' })
+          .border({ width: 1, color: tc('color_md_code_border') })
           .margin({ top: 4, bottom: 4 })
         } else if (block.type === 'listItem') {
           Row() {
             Text(this.listBulletMarker(block.indent, block.listType))
               .fontSize(15)
-              .fontColor('#1A1A1A')
+              .fontColor(tc('color_md_text'))
             let segs = parseInlineElements(block.content);
             Row() {
               ForEach(segs, (seg: InlineSegment) => {
                 if (seg.type === 'text') {
-                  Text(seg.content).fontSize(15).fontColor('#1A1A1A')
+                  Text(seg.content).fontSize(15).fontColor(tc('color_md_text'))
                 } else if (seg.type === 'bold') {
-                  Text(seg.content).fontSize(15).fontColor('#1A1A1A').fontWeight(FontWeight.Bold)
+                  Text(seg.content).fontSize(15).fontColor(tc('color_md_bold')).fontWeight(FontWeight.Bold)
                 } else if (seg.type === 'italic') {
-                  Text(seg.content).fontSize(15).fontColor('#1A1A1A').fontStyle(FontStyle.Italic)
+                  Text(seg.content).fontSize(15).fontColor(tc('color_md_text')).fontStyle(FontStyle.Italic)
                 } else if (seg.type === 'inlineCode') {
                   Text(seg.content)
-                    .fontSize(14).fontColor('#D63384').backgroundColor('#F5F5F5')
+                    .fontSize(14).fontColor(tc('color_md_inline_code')).backgroundColor(tc('color_md_inline_code_bg'))
                     .borderRadius(4).padding({ left: 4, right: 4, top: 1, bottom: 1 })
                 } else if (seg.type === 'link') {
                   Text(seg.content)
-                    .fontSize(15).fontColor('#0D6EFD')
-                    .decoration({ type: TextDecorationType.Underline, color: '#0D6EFD' })
+                    .fontSize(15).fontColor(tc('color_md_link'))
+                    .decoration({ type: TextDecorationType.Underline, color: tc('color_md_link') })
                     .onClick(() => {
                       if (seg.url) {
                         console.info('[MarkdownRenderer] Link:', seg.url);
@@ -410,19 +411,19 @@ export struct MarkdownRenderer {
           Row() {
             ForEach(segs, (seg: InlineSegment) => {
               if (seg.type === 'text') {
-                Text(seg.content).fontSize(15).fontColor('#1A1A1A')
+                Text(seg.content).fontSize(15).fontColor(tc('color_md_text'))
               } else if (seg.type === 'bold') {
-                Text(seg.content).fontSize(15).fontColor('#1A1A1A').fontWeight(FontWeight.Bold)
+                Text(seg.content).fontSize(15).fontColor(tc('color_md_bold')).fontWeight(FontWeight.Bold)
               } else if (seg.type === 'italic') {
-                Text(seg.content).fontSize(15).fontColor('#1A1A1A').fontStyle(FontStyle.Italic)
+                Text(seg.content).fontSize(15).fontColor(tc('color_md_text')).fontStyle(FontStyle.Italic)
               } else if (seg.type === 'inlineCode') {
                 Text(seg.content)
-                  .fontSize(14).fontColor('#D63384').backgroundColor('#F5F5F5')
+                  .fontSize(14).fontColor(tc('color_md_inline_code')).backgroundColor(tc('color_md_inline_code_bg'))
                   .borderRadius(4).padding({ left: 4, right: 4, top: 1, bottom: 1 })
               } else if (seg.type === 'link') {
                 Text(seg.content)
-                  .fontSize(15).fontColor('#0D6EFD')
-                  .decoration({ type: TextDecorationType.Underline, color: '#0D6EFD' })
+                  .fontSize(15).fontColor(tc('color_md_link'))
+                  .decoration({ type: TextDecorationType.Underline, color: tc('color_md_link') })
                   .onClick(() => {
                     if (seg.url) {
                       console.info('[MarkdownRenderer] Link:', seg.url);
