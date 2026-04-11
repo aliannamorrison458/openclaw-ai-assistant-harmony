@@ -1,4 +1,4 @@
-// Index.ets — 聊天主页面（集成语音输入和播报功能）
+// Index.ets — 聊天主页面（集成语音输入 + 多会话管理）
 import { ChatViewModel } from '../viewmodel/ChatViewModel';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
@@ -13,25 +13,37 @@ struct Index {
   @State quotingMessage: ChatMessage | null = null;
   @State showContextMenu: boolean = false;
   @State contextMenuMessage: ChatMessage | null = null;
+  @State sessionTitle: string = '新对话';
 
   aboutToAppear() {
     this.viewModel.onUpdate(() => {
-      // Trigger re-render by updating state
       this.showOfflineBanner = this.viewModel.isOffline;
       this.inputText = this.viewModel.inputText;
+      this.sessionTitle = this.viewModel.currentSessionTitle;
     });
   }
 
   build() {
     Column() {
-      // Navigation bar
+      // Navigation bar — 显示当前会话名称 + 左侧会话列表入口
       Row() {
-        Text('AI 助手')
-          .fontSize(20)
+        // 左侧按钮：打开会话列表
+        Text('☰')
+          .fontSize(22)
+          .fontColor('#4A90D9')
+          .margin({ right: 12 })
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/SessionListPage' });
+          })
+
+        // 会话标题
+        Text(this.sessionTitle)
+          .fontSize(18)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A1A1A')
-
-        Blank()
+          .maxLines(1)
+          .textOverflow({ overflow: TextOverflow.Ellipsis })
+          .layoutWeight(1)
 
         // Network status indicator
         if (this.showOfflineBanner) {
@@ -41,6 +53,7 @@ struct Index {
             .backgroundColor('#FF9800')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
+            .margin({ right: 8 })
         } else if (this.viewModel.isWeakNetwork) {
           Text('弱网')
             .fontSize(12)
@@ -48,12 +61,13 @@ struct Index {
             .backgroundColor('#FFC107')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
+            .margin({ right: 8 })
         }
 
         // Settings button
         Text('⚙️')
           .fontSize(22)
-          .margin({ left: 12 })
+          .margin({ left: 4 })
           .onClick(() => {
             router.pushUrl({ url: 'pages/SettingsPage' });
           })
@@ -98,20 +112,16 @@ struct Index {
       // Voice state indicator (recording / processing / playing)
       if (this.viewModel.voiceState !== VoiceState.IDLE) {
         Row() {
-          // Animated indicator based on state
           if (this.viewModel.isRecording) {
-            // Recording indicator: pulsing red dot
             Text('🔴')
               .fontSize(14)
               .animation({ duration: 500, iterations: -1, playMode: PlayMode.Alternate })
           } else if (this.viewModel.isVoiceProcessing) {
-            // Processing indicator: spinner
             LoadingProgress()
               .width(16)
               .height(16)
               .color('#4A90D9')
           } else if (this.viewModel.isVoicePlaying) {
-            // Playing indicator: speaker
             Text('🔊')
               .fontSize(14)
           }
@@ -148,9 +158,6 @@ struct Index {
       .layoutWeight(1)
       .padding({ left: 12, right: 12, top: 8 })
       .scrollBar(BarState.Off)
-      .onScrollIndex((start: number, end: number) => {
-        // Auto-scroll handled by List
-      })
 
       // Quoting preview bar
       if (this.quotingMessage) {
@@ -187,7 +194,6 @@ struct Index {
 
       // Input area
       Row() {
-        // Voice button - changes state based on current activity
         this.buildVoiceButton()
 
         TextInput({ text: this.inputText, placeholder: '输入消息...' })
@@ -231,9 +237,7 @@ struct Index {
 
   @Builder
   buildVoiceButton() {
-    // Voice button with 3 states
     if (this.viewModel.isRecording) {
-      // Recording state: red stop button
       Button('⏹')
         .width(40)
         .height(40)
@@ -252,7 +256,6 @@ struct Index {
             })
         )
     } else if (this.viewModel.isVoiceProcessing) {
-      // Processing state: disabled button with spinner
       Button() {
         LoadingProgress()
           .width(20)
@@ -266,7 +269,6 @@ struct Index {
       .margin({ right: 8 })
       .enabled(false)
     } else if (this.viewModel.isVoicePlaying) {
-      // Playing state: stop button
       Button('🔊')
         .width(40)
         .height(40)
@@ -279,7 +281,6 @@ struct Index {
           this.viewModel.stopSpeaking();
         })
     } else {
-      // Idle state: microphone button
       Button('🎤')
         .width(40)
         .height(40)
@@ -298,14 +299,12 @@ struct Index {
   @Builder
   buildContextMenu() {
     Column() {
-      // Backdrop
       Column()
         .width('100%')
         .height('100%')
         .backgroundColor('rgba(0,0,0,0.3)')
         .onClick(() => this.showContextMenu = false)
 
-      // Menu items
       Column() {
         if (this.contextMenuMessage?.isUser) {
           Text('复制')
@@ -332,7 +331,6 @@ struct Index {
 
           Divider()
 
-          // 语音播报选项
           Text('语音播报')
             .fontSize(16)
             .width('100%')
@@ -370,7 +368,6 @@ struct Index {
               this.showContextMenu = false;
             })
         } else {
-          // Assistant message
           Text('复制')
             .fontSize(16)
             .width('100%')
@@ -395,7 +392,6 @@ struct Index {
 
           Divider()
 
-          // 语音播报选项
           Text('语音播报')
             .fontSize(16)
             .width('100%')
@@ -428,7 +424,6 @@ struct Index {
   }
 
   private copyText(text: string): void {
-    // ArkTS clipboard API
     import { systemPasteboard } from '@kit.BasicServicesKit';
     systemPasteboard.setData(systemPasteboard.MIMETYPE_TEXT_PLAINTEXT, text, (err) => {
       if (err) {

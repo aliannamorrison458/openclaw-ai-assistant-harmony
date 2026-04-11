@@ -1,13 +1,14 @@
-// ChatViewModel.ets — 聊天 ViewModel（集成语音功能）
-import { ChatMessage, SendStatus, createUserId, createAssistantMessage, createSystemMessage } from '../common/ChatTypes';
+// ChatViewModel.ets — 聊天 ViewModel（集成语音功能 + 多会话支持）
+import { ChatMessage, SendStatus, ChatSession, createUserId, createAssistantMessage, createSystemMessage } from '../common/ChatTypes';
 import { LLMClient, MockLLMClient, LLMConfig } from '../service/LLMClient';
 import { NetworkMonitor, ConnectionType, NetworkQuality } from '../service/NetworkMonitor';
 import { VoiceServiceManager, VoiceState } from '../service/VoiceServiceManager';
+import { SessionManager } from '../service/SessionManager';
 import { preferences } from '@kit.ArkData';
 
 const PREF_NAME = 'ai_assistant_prefs';
 const KEY_API_BASE = 'api_base_url';
-const KEY_API_TOKEN='***';
+const KEY_API_TOKEN = '***';
 const KEY_USE_MOCK = 'use_mock';
 const KEY_MODEL = 'model_name';
 
@@ -17,6 +18,7 @@ export class ChatViewModel {
   isDegraded: boolean = false;
   isWeakNetwork: boolean = false;
   inputText: string = '';
+  currentSessionTitle: string = '新对话';
 
   // 语音相关状态
   voiceState: VoiceState = VoiceState.IDLE;
@@ -30,14 +32,17 @@ export class ChatViewModel {
   private useMock: boolean = true;
   private networkMonitor: NetworkMonitor;
   private voiceManager: VoiceServiceManager;
+  private sessionManager: SessionManager;
   private prefStore: preferences.Preferences | null = null;
   private _onUpdate: (() => void) | null = null;
+  private _debounceTimer: number = 0;
 
   constructor() {
     this.llmClient = new LLMClient();
     this.mockClient = new MockLLMClient();
     this.networkMonitor = NetworkMonitor.getInstance();
     this.voiceManager = VoiceServiceManager.getInstance();
+    this.sessionManager = SessionManager.getInstance();
     this._init();
   }
 
@@ -52,6 +57,17 @@ export class ChatViewModel {
   }
 
   private async _init(): Promise<void> {
+    // 初始化 SessionManager
+    await this.sessionManager.init();
+
+    // 监听会话变化
+    this.sessionManager.onUpdate(() => {
+      this._refreshCurrentSession();
+    });
+
+    // 加载当前会话的消息
+    await this._loadCurrentSessionMessages();
+
     // Load preferences
     try {
       this.prefStore = await preferences.getPreferences(globalThis.context, PREF_NAME);
@@ -90,7 +106,6 @@ export class ChatViewModel {
     });
 
     this.voiceManager.onSTTResult((text: string) => {
-      // STT 结果自动填入输入框
       this.inputText = text;
       this._notify();
     });
@@ -103,7 +118,6 @@ export class ChatViewModel {
     this.voiceManager.onOfflineWarning((message: string) => {
       this.voiceOfflineWarning = message;
       this._notify();
-      // 3秒后自动清除
       setTimeout(() => {
         this.voiceOfflineWarning = '';
         this._notify();
@@ -111,11 +125,40 @@ export class ChatViewModel {
     });
   }
 
+  private async _loadCurrentSessionMessages(): Promise<void> {
+    const sessionId = this.sessionManager.getCurrentSessionId();
+    if (!sessionId) return;
+    this.messages = await this.sessionManager.loadMessages(sessionId);
+    const session = this.sessionManager.getCurrentSession();
+    this.currentSessionTitle = session?.title || '新对话';
+    this._notify();
+  }
+
+  private async _refreshCurrentSession(): Promise<void> {
+    const session = this.sessionManager.getCurrentSession();
+    if (session) {
+      this.currentSessionTitle = session.title;
+    }
+    this._notify();
+  }
+
+  // 防抖保存消息
+  private _debouncedSaveMessages(): void {
+    if (this._debounceTimer) {
+      clearTimeout(this._debounceTimer);
+    }
+    this._debounceTimer = setTimeout(() => {
+      const sessionId = this.sessionManager.getCurrentSessionId();
+      if (sessionId) {
+        this.sessionManager.saveMessages(sessionId, this.messages);
+      }
+    }, 300);
+  }
+
   get canSend(): boolean {
     return !this.messages.some(m => m.isUser && m.sendStatus === SendStatus.SENDING);
   }
 
-  // 语音相关方法
   get canUseVoice(): boolean {
     return !this.isOffline && this.voiceState === VoiceState.IDLE;
   }
@@ -127,6 +170,32 @@ export class ChatViewModel {
       case VoiceState.PLAYING: return '播放中...';
       default: return '';
     }
+  }
+
+  // 获取会话列表
+  getSessions(): ChatSession[] {
+    return this.sessionManager.getSessions();
+  }
+
+  getCurrentSessionId(): string {
+    return this.sessionManager.getCurrentSessionId();
+  }
+
+  // 创建新会话
+  async createNewSession(): Promise<void> {
+    await this.sessionManager.createSession();
+    await this._loadCurrentSessionMessages();
+  }
+
+  // 切换会话
+  async switchSession(sessionId: string): Promise<void> {
+    // 先保存当前会话消息
+    const currentId = this.sessionManager.getCurrentSessionId();
+    if (currentId) {
+      await this.sessionManager.saveMessages(currentId, this.messages);
+    }
+    await this.sessionManager.switchSession(sessionId);
+    await this._loadCurrentSessionMessages();
   }
 
   startVoiceRecording(): void {
@@ -159,7 +228,7 @@ export class ChatViewModel {
     this.voiceManager.stopSpeaking();
   }
 
-  send(text: string, quotedMessageId?: string, quotedText?: string): void {
+  async send(text: string, quotedMessageId?: string, quotedText?: string): Promise<void> {
     if (!text.trim()) return;
     if (!this.canSend) return;
 
@@ -178,6 +247,12 @@ export class ChatViewModel {
       this.messages.push(createSystemMessage('⚠️ 已降级到本地模式'));
     }
 
+    // 更新会话信息
+    await this.sessionManager.updateSessionOnNewMessage(
+      this.sessionManager.getCurrentSessionId(),
+      userMsg
+    );
+    this._debouncedSaveMessages();
     this._notify();
 
     const callback = (response: { success: boolean; content: string; error?: string }) => {
@@ -186,11 +261,17 @@ export class ChatViewModel {
 
       if (response.success) {
         this.messages[idx].sendStatus = SendStatus.SENT;
-        this.messages.push(createAssistantMessage(response.content));
+        const assistantMsg = createAssistantMessage(response.content);
+        this.messages.push(assistantMsg);
+        this.sessionManager.updateSessionOnNewMessage(
+          this.sessionManager.getCurrentSessionId(),
+          assistantMsg
+        );
       } else {
         this.messages[idx].sendStatus = SendStatus.FAILED;
         this.messages.push(createSystemMessage(`错误: ${response.error || '未知错误'}`));
       }
+      this._debouncedSaveMessages();
       this._notify();
     };
 
@@ -218,6 +299,7 @@ export class ChatViewModel {
       } else {
         this.messages[idx].sendStatus = SendStatus.FAILED;
       }
+      this._debouncedSaveMessages();
       this._notify();
     };
 
@@ -232,12 +314,14 @@ export class ChatViewModel {
     const idx = this.messages.findIndex(m => m.id === messageId);
     if (idx >= 0) {
       this.messages.splice(idx, 1);
+      this._debouncedSaveMessages();
       this._notify();
     }
   }
 
   clearAll(): void {
     this.messages = [];
+    this._debouncedSaveMessages();
     this._notify();
   }
 

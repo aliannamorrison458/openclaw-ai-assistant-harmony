@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/SessionListPage",
     "pages/SettingsPage"
   ]
 }
