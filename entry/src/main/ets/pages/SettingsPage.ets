@@ -6,6 +6,16 @@ import { DarkModeSetting, tc, setDarkModeSetting, getDarkModeSetting } from '../
 
 const LANG_PREF_KEY = 'app_language';
 const PREF_NAME = 'ai_assistant_prefs';
+const SYSTEM_PROMPT_KEY = 'system_prompt';
+const MAX_PROMPT_LENGTH = 2000;
+
+// 预设模板
+const PROMPT_TEMPLATES: Record<string, string> = {
+  'professional': '你是一位专业的AI助手，擅长分析问题并提供准确、有条理的回答。请用简洁专业的语言回复。',
+  'translator': '你是一位精通多语言的翻译专家。请准确翻译用户输入的内容，保持原文的语气和风格。如果原文有歧义，请提供最可能的翻译并在括号中注明备选翻译。',
+  'coder': '你是一位资深软件工程师，精通多种编程语言和技术栈。请提供高质量的代码解决方案，包含必要的注释。优先考虑代码的可读性、性能和安全性。',
+  'writer': '你是一位经验丰富的写作助手，擅长各类文体的创作和润色。请帮助用户优化文字表达，提升文章的逻辑性和可读性，同时保持用户的个人风格。'
+};
 
 @Entry
 @Component
@@ -18,6 +28,9 @@ struct SettingsPage {
   @State selectedLanguage: string = 'follow_system';
   @StorageProp('darkModeSetting') darkMode: DarkModeSetting = 'system';
 
+  @State systemPrompt: string = '';
+  @State selectedTemplate: string = '';
+
   private viewModel: ChatViewModel | null = null;
 
   aboutToAppear() {
@@ -28,6 +41,9 @@ struct SettingsPage {
         this.apiKey = settings.apiKey;
         this.useMock = settings.useMock;
         this.model = settings.model;
+      });
+      this.viewModel.getSystemPrompt().then((prompt) => {
+        this.systemPrompt = prompt;
       });
     }
     this.loadLanguagePreference();
@@ -172,6 +188,77 @@ struct SettingsPage {
           .padding({ top: 8, bottom: 8 })
           .backgroundColor(tc('color_surface'))
           .borderRadius(8)
+
+          Divider()
+            .color(tc('color_divider'))
+            .margin({ top: 8, bottom: 8 })
+
+          // === 系统 Prompt 设置 ===
+          Text('系统 Prompt')
+            .fontSize(18)
+            .fontWeight(FontWeight.Bold)
+            .fontColor(tc('color_text_primary'))
+            .width('100%')
+
+          // 预设模板选择
+          Text('预设模板')
+            .fontSize(13)
+            .fontColor(tc('color_text_secondary'))
+            .width('100%')
+
+          Row({ space: 8 }) {
+            this.buildTemplateButton('professional', '专业助手')
+            this.buildTemplateButton('translator', '翻译')
+            this.buildTemplateButton('coder', '编程')
+            this.buildTemplateButton('writer', '写作')
+          }
+          .width('100%')
+          .flexWrap(FlexWrap.Wrap)
+
+          // TextArea 编辑
+          TextArea({ text: this.systemPrompt, placeholder: '输入自定义系统 Prompt，定义 AI 助手的行为和风格...' })
+            .width('100%')
+            .height(160)
+            .fontSize(14)
+            .fontColor(tc('color_text_primary'))
+            .placeholderColor(tc('color_text_placeholder'))
+            .backgroundColor(tc('color_surface_alt'))
+            .borderRadius(8)
+            .padding({ left: 12, right: 12, top: 8, bottom: 8 })
+            .maxLength(MAX_PROMPT_LENGTH)
+            .onChange((value: string) => {
+              this.systemPrompt = value;
+              this.selectedTemplate = '';
+            })
+
+          // 字数计数器
+          Row() {
+            if (this.systemPrompt.length > MAX_PROMPT_LENGTH) {
+              Text(`⚠️ 已超出 ${this.systemPrompt.length - MAX_PROMPT_LENGTH} 字`)
+                .fontSize(12)
+                .fontColor('#E53935')
+            } else {
+              Text(`${this.systemPrompt.length} / ${MAX_PROMPT_LENGTH}`)
+                .fontSize(12)
+                .fontColor(this.systemPrompt.length > MAX_PROMPT_LENGTH * 0.9 ? '#FF9800' : tc('color_text_tertiary'))
+            }
+            Blank()
+            Button('重置')
+              .fontSize(12)
+              .height(28)
+              .padding({ left: 12, right: 12 })
+              .fontColor(tc('color_text_secondary'))
+              .backgroundColor(tc('color_surface_alt'))
+              .borderRadius(14)
+              .onClick(() => {
+                this.systemPrompt = '';
+                this.selectedTemplate = '';
+                if (this.viewModel) {
+                  this.viewModel.saveSystemPrompt('');
+                }
+              })
+          }
+          .width('100%')
 
           Divider()
             .color(tc('color_divider'))
@@ -325,10 +412,26 @@ struct SettingsPage {
   private saveSettings(): void {
     if (this.viewModel) {
       this.viewModel.saveSettings(this.baseURL, this.apiKey, this.useMock, this.model);
+      this.viewModel.saveSystemPrompt(this.systemPrompt);
     }
     this.saved = true;
     setTimeout(() => {
       this.saved = false;
     }, 2000);
+  }
+
+  @Builder
+  buildTemplateButton(key: string, label: string) {
+    Button(label)
+      .fontSize(12)
+      .height(32)
+      .padding({ left: 12, right: 12 })
+      .fontColor(this.selectedTemplate === key ? tc('color_text_on_accent') : tc('color_text_secondary'))
+      .backgroundColor(this.selectedTemplate === key ? tc('color_accent') : tc('color_surface_alt'))
+      .borderRadius(16)
+      .onClick(() => {
+        this.selectedTemplate = key;
+        this.systemPrompt = PROMPT_TEMPLATES[key] || '';
+      })
   }
 }

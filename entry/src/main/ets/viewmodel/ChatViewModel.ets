@@ -1,6 +1,6 @@
 // ChatViewModel.ets — 聊天 ViewModel（集成语音功能 + 多会话支持）
 import { ChatMessage, SendStatus, ChatSession, createUserId, createAssistantMessage, createSystemMessage } from '../common/ChatTypes';
-import { LLMClient, MockLLMClient, LLMConfig } from '../service/LLMClient';
+import { LLMClient, MockLLMClient, LLMConfig, ConversationMessage, LLMStreamCallbacks } from '../service/LLMClient';
 import { NetworkMonitor, ConnectionType, NetworkQuality } from '../service/NetworkMonitor';
 import { VoiceServiceManager, VoiceState } from '../service/VoiceServiceManager';
 import { SessionManager } from '../service/SessionManager';
@@ -8,9 +8,10 @@ import { preferences } from '@kit.ArkData';
 
 const PREF_NAME = 'ai_assistant_prefs';
 const KEY_API_BASE = 'api_base_url';
-const KEY_API_TOKEN = '***';
+const KEY_API_TOKEN='***';
 const KEY_USE_MOCK = 'use_mock';
 const KEY_MODEL = 'model_name';
+const KEY_SYSTEM_PROMPT = 'system_prompt';
 
 export class ChatViewModel {
   messages: ChatMessage[] = [];
@@ -255,13 +256,16 @@ export class ChatViewModel {
     this._debouncedSaveMessages();
     this._notify();
 
-    const callback = (response: { success: boolean; content: string; error?: string }) => {
+    const callback = (response: { success: boolean; content: string; thinking?: string; error?: string }) => {
       const idx = this.messages.findIndex(m => m.id === messageId);
       if (idx < 0) return;
 
       if (response.success) {
         this.messages[idx].sendStatus = SendStatus.SENT;
         const assistantMsg = createAssistantMessage(response.content);
+        if (response.thinking) {
+          assistantMsg.thinkingContent = response.thinking;
+        }
         this.messages.push(assistantMsg);
         this.sessionManager.updateSessionOnNewMessage(
           this.sessionManager.getCurrentSessionId(),
@@ -278,11 +282,163 @@ export class ChatViewModel {
     if (this.useMock || wasOffline) {
       this.mockClient.sendMessage(text, callback);
     } else {
-      this.llmClient.sendMessage(text, callback);
+      const systemPrompt = await this.getSystemPrompt();
+      this.llmClient.sendMessage(text, callback, systemPrompt);
     }
   }
 
-  retry(messageId: string): void {
+  // 流式发送（支持 Thinking 实时展示）
+  async sendStreaming(text: string, quotedMessageId?: string, quotedText?: string): Promise<void> {
+    if (!text.trim()) return;
+    if (!this.canSend) return;
+
+    const wasOffline = this.isOffline;
+
+    const userMsg = createUserId(text);
+    userMsg.sendStatus = SendStatus.SENDING;
+    userMsg.isDegraded = wasOffline;
+    userMsg.quotedMessageId = quotedMessageId;
+    userMsg.quotedText = quotedText;
+
+    this.messages.push(userMsg);
+    const messageId = userMsg.id;
+
+    if (wasOffline) {
+      this.messages.push(createSystemMessage('⚠️ 已降级到本地模式'));
+    }
+
+    await this.sessionManager.updateSessionOnNewMessage(
+      this.sessionManager.getCurrentSessionId(),
+      userMsg
+    );
+    this._debouncedSaveMessages();
+    this._notify();
+
+    if (this.useMock || wasOffline) {
+      const callback = (response: { success: boolean; content: string; error?: string }) => {
+        const idx = this.messages.findIndex(m => m.id === messageId);
+        if (idx < 0) return;
+        if (response.success) {
+          this.messages[idx].sendStatus = SendStatus.SENT;
+          const assistantMsg = createAssistantMessage(response.content);
+          this.messages.push(assistantMsg);
+        } else {
+          this.messages[idx].sendStatus = SendStatus.FAILED;
+          this.messages.push(createSystemMessage(`错误: ${response.error || '未知错误'}`));
+        }
+        this._debouncedSaveMessages();
+        this._notify();
+      };
+      this.mockClient.sendMessage(text, callback);
+      return;
+    }
+
+    // Build conversation history
+    const convMessages: Array<{ role: string; content: string }> = [];
+    for (let i = 0; i < this.messages.length; i++) {
+      const m = this.messages[i];
+      if (m.messageType === 'system') continue;
+      convMessages.push({
+        role: m.isUser ? 'user' : 'assistant',
+        content: m.text
+      });
+    }
+
+    // Create assistant message for streaming accumulation
+    const assistantMsg = createAssistantMessage('');
+    assistantMsg.thinkingContent = '';
+    this.messages.push(assistantMsg);
+    const assistantId = assistantMsg.id;
+
+    const callbacks: LLMStreamCallbacks = {
+      onContent: (chunk: string) => {
+        const aIdx = this.messages.findIndex(m => m.id === assistantId);
+        if (aIdx >= 0) {
+          this.messages[aIdx].text += chunk;
+          this._notify();
+        }
+      },
+      onThinking: (chunk: string) => {
+        const aIdx = this.messages.findIndex(m => m.id === assistantId);
+        if (aIdx >= 0) {
+          if (!this.messages[aIdx].thinkingContent) {
+            this.messages[aIdx].thinkingContent = '';
+          }
+          this.messages[aIdx].thinkingContent += chunk;
+          this._notify();
+        }
+      },
+      onToolCall: (toolCalls) => {
+        console.log('[ChatViewModel] Tool calls:', JSON.stringify(toolCalls));
+      },
+      onComplete: (_finishReason: string) => {
+        const uIdx = this.messages.findIndex(m => m.id === messageId);
+        if (uIdx >= 0) {
+          this.messages[uIdx].sendStatus = SendStatus.SENT;
+        }
+        const aIdx = this.messages.findIndex(m => m.id === assistantId);
+        if (aIdx >= 0) {
+          this.sessionManager.updateSessionOnNewMessage(
+            this.sessionManager.getCurrentSessionId(),
+            this.messages[aIdx]
+          );
+        }
+        this._debouncedSaveMessages();
+        this._notify();
+      },
+      onError: (error: string) => {
+        const uIdx = this.messages.findIndex(m => m.id === messageId);
+        if (uIdx >= 0) {
+          this.messages[uIdx].sendStatus = SendStatus.FAILED;
+        }
+        const aIdx = this.messages.findIndex(m => m.id === assistantId);
+        if (aIdx >= 0 && !this.messages[aIdx].text) {
+          this.messages.splice(aIdx, 1);
+        }
+        this.messages.push(createSystemMessage(`错误: ${error}`));
+        this._debouncedSaveMessages();
+        this._notify();
+      }
+    };
+
+    const systemPrompt = await this.getSystemPrompt();
+    const conversationMessages = LLMClient.buildConversationHistory(convMessages);
+    this.llmClient.sendStreaming(conversationMessages, callbacks, systemPrompt);
+  }
+
+  // 重新生成最后一条 AI 回复
+  regenerateLastResponse(): void {
+    let lastAssistantIdx = -1;
+    for (let i = this.messages.length - 1; i >= 0; i--) {
+      if (!this.messages[i].isUser && this.messages[i].sendStatus === SendStatus.NONE) {
+        lastAssistantIdx = i;
+        break;
+      }
+    }
+    if (lastAssistantIdx < 0) return;
+
+    let lastUserIdx = -1;
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (this.messages[i].isUser) {
+        lastUserIdx = i;
+        break;
+      }
+    }
+    if (lastUserIdx < 0) return;
+
+    const userText = this.messages[lastUserIdx].text;
+    const quotedId = this.messages[lastUserIdx].quotedMessageId;
+    const quotedText = this.messages[lastUserIdx].quotedText;
+
+    // Remove last assistant message
+    this.messages.splice(lastAssistantIdx, 1);
+    this._notify();
+
+    // Re-send
+    this.sendStreaming(userText, quotedId, quotedText);
+  }
+
+  async retry(messageId: string): Promise<void> {
     const idx = this.messages.findIndex(m => m.id === messageId);
     if (idx < 0) return;
 
@@ -306,7 +462,8 @@ export class ChatViewModel {
     if (this.useMock || this.isOffline) {
       this.mockClient.sendMessage(msg.text, callback);
     } else {
-      this.llmClient.sendMessage(msg.text, callback);
+      const systemPrompt = await this.getSystemPrompt();
+      this.llmClient.sendMessage(msg.text, callback, systemPrompt);
     }
   }
 
@@ -348,5 +505,20 @@ export class ChatViewModel {
       useMock: await this.prefStore.get(KEY_USE_MOCK, true) as boolean,
       model: await this.prefStore.get(KEY_MODEL, 'gpt-3.5-turbo') as string
     };
+  }
+
+  async getSystemPrompt(): Promise<string> {
+    if (!this.prefStore) {
+      this.prefStore = await preferences.getPreferences(globalThis.context, PREF_NAME);
+    }
+    return await this.prefStore.get(KEY_SYSTEM_PROMPT, '') as string;
+  }
+
+  async saveSystemPrompt(prompt: string): Promise<void> {
+    if (!this.prefStore) {
+      this.prefStore = await preferences.getPreferences(globalThis.context, PREF_NAME);
+    }
+    await this.prefStore.put(KEY_SYSTEM_PROMPT, prompt);
+    await this.prefStore.flush();
   }
 }

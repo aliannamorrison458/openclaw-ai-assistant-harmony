@@ -313,7 +313,7 @@ export class LLMClient {
 
   // ─── Non-streaming send (backward compatible) ───────────
 
-  sendMessage(prompt: string, callback: (response: LLMResponse) => void): void {
+  sendMessage(prompt: string, callback: (response: LLMResponse) => void, systemPrompt?: string): void {
     if (!this.config.apiKey) {
       callback({ success: false, content: '', error: 'API Key 未配置，请在设置中填写' });
       return;
@@ -322,9 +322,11 @@ export class LLMClient {
     const httpRequest = http.createHttp();
     const url = `${this.config.baseURL}/chat/completions`;
 
-    const messages: ConversationMessage[] = [
-      { role: 'user', content: prompt }
-    ];
+    const messages: ConversationMessage[] = [];
+    if (systemPrompt && systemPrompt.trim().length > 0) {
+      messages.push({ role: 'system', content: systemPrompt.trim() });
+    }
+    messages.push({ role: 'user', content: prompt });
 
     const bodyObj: Record<string, Object> = {
       model: this.config.model,
@@ -399,7 +401,8 @@ export class LLMClient {
 
   sendStreaming(
     messages: ConversationMessage[],
-    callbacks: LLMStreamCallbacks
+    callbacks: LLMStreamCallbacks,
+    systemPrompt?: string
   ): void {
     if (!this.config.apiKey) {
       callbacks.onError('API Key 未配置，请在设置中填写');
@@ -409,9 +412,18 @@ export class LLMClient {
     const httpRequest = http.createHttp();
     const url = `${this.config.baseURL}/chat/completions`;
 
+    // Prepend system prompt if provided
+    const finalMessages: ConversationMessage[] = [];
+    if (systemPrompt && systemPrompt.trim().length > 0) {
+      finalMessages.push({ role: 'system', content: systemPrompt.trim() });
+    }
+    for (let mi = 0; mi < messages.length; mi++) {
+      finalMessages.push(messages[mi]);
+    }
+
     const bodyObj: Record<string, Object> = {
       model: this.config.model,
-      messages: messages,
+      messages: finalMessages,
       stream: true,
       max_tokens: this.config.maxTokens,
       temperature: this.config.temperature
