@@ -69,6 +69,7 @@ const COLOR_MAP: Record<string, ColorDef> = {
   color_voice_indicator_bg: { light: '#E3F2FD', dark: '#1A2A3D' },
   color_voice_indicator_text: { light: '#4A90D9', dark: '#7BB8E8' },
   color_info: { light: '#4A90D9', dark: '#5BA0E8' },
+  color_thinking_bg: { light: '#F0F4F8', dark: '#2A2D32' },
 };
 
 // 判断当前是否为暗色模式

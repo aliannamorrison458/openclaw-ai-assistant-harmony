@@ -1,4 +1,4 @@
-// Index.ets — 聊天主页面（集成语音输入和播报功能 + 深色模式）
+// Index.ets — 聊天主页面（Thinking 展示 + 重新生成 + 语音 + 深色模式 + 无障碍 + 键盘滚底）
 import { ChatViewModel } from '../viewmodel/ChatViewModel';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
@@ -16,12 +16,33 @@ struct Index {
   @State contextMenuMessage: ChatMessage | null = null;
   @StorageProp('darkModeSetting') darkMode: DarkModeSetting = 'system';
 
+  private listScroller: Scroller = new Scroller();
+  private keyboardHeight: number = 0;
+
   aboutToAppear() {
     this.viewModel.onUpdate(() => {
-      // Trigger re-render by updating state
       this.showOfflineBanner = this.viewModel.isOffline;
       this.inputText = this.viewModel.inputText;
+      // 自动滚底
+      this.scrollToEnd();
     });
+  }
+
+  private scrollToEnd(): void {
+    setTimeout(() => {
+      this.listScroller.scrollEdge(Edge.Bottom);
+    }, 100);
+  }
+
+  private isLastAssistantMessage(msg: ChatMessage): boolean {
+    if (msg.isUser) return false;
+    for (let i = this.viewModel.messages.length - 1; i >= 0; i--) {
+      const m = this.viewModel.messages[i];
+      if (!m.isUser && m.sendStatus === SendStatus.NONE) {
+        return m.id === msg.id;
+      }
+    }
+    return false;
   }
 
   build() {
@@ -52,10 +73,20 @@ struct Index {
             .borderRadius(10)
         }
 
+        // 会话列表按钮
+        Text('💬')
+          .fontSize(22)
+          .margin({ left: 12 })
+          .accessibilityText('会话列表')
+          .onClick(() => {
+            router.pushUrl({ url: 'pages/SessionListPage' });
+          })
+
         // Settings button
         Text('⚙️')
           .fontSize(22)
           .margin({ left: 12 })
+          .accessibilityText('设置')
           .onClick(() => {
             router.pushUrl({ url: 'pages/SettingsPage' });
           })
@@ -100,20 +131,16 @@ struct Index {
       // Voice state indicator (recording / processing / playing)
       if (this.viewModel.voiceState !== VoiceState.IDLE) {
         Row() {
-          // Animated indicator based on state
           if (this.viewModel.isRecording) {
-            // Recording indicator: pulsing red dot
             Text('🔴')
               .fontSize(14)
               .animation({ duration: 500, iterations: -1, playMode: PlayMode.Alternate })
           } else if (this.viewModel.isVoiceProcessing) {
-            // Processing indicator: spinner
             LoadingProgress()
               .width(16)
               .height(16)
               .color(tc('color_voice_indicator_text'))
           } else if (this.viewModel.isVoicePlaying) {
-            // Playing indicator: speaker
             Text('🔊')
               .fontSize(14)
           }
@@ -132,16 +159,19 @@ struct Index {
       }
 
       // Message list
-      List({ space: 8 }) {
+      List({ space: 8, scroller: this.listScroller }) {
         ForEach(this.viewModel.messages, (msg: ChatMessage) => {
           ListItem() {
             MessageBubble({
               message: msg,
+              isLastAssistant: this.isLastAssistantMessage(msg),
               onRetry: () => this.viewModel.retry(msg.id),
               onLongPress: (m: ChatMessage) => {
                 this.contextMenuMessage = m;
                 this.showContextMenu = true;
               },
+              onSpeak: (text: string) => this.viewModel.speakText(text),
+              onRegenerate: () => this.viewModel.regenerateLastResponse(),
               quoteAssistantLabel: $r('app.string.quote_assistant').toString(),
               quoteYouLabel: $r('app.string.quote_you').toString(),
               retryLabel: $r('app.string.btn_retry').toString(),
@@ -154,9 +184,6 @@ struct Index {
       .layoutWeight(1)
       .padding({ left: 12, right: 12, top: 8 })
       .scrollBar(BarState.Off)
-      .onScrollIndex((start: number, end: number) => {
-        // Auto-scroll handled by List
-      })
 
       // Quoting preview bar
       if (this.quotingMessage) {
@@ -183,6 +210,7 @@ struct Index {
           Text('✕')
             .fontSize(16)
             .fontColor(tc('color_text_tertiary'))
+            .accessibilityText('取消引用')
             .onClick(() => this.quotingMessage = null)
         }
         .width('100%')
@@ -191,9 +219,8 @@ struct Index {
         .backgroundColor(tc('color_quote_bg'))
       }
 
-      // Input area
+      // Input area — 跟随键盘上移
       Row() {
-        // Voice button - changes state based on current activity
         this.buildVoiceButton()
 
         TextInput({ text: this.inputText, placeholder: $r('app.string.input_placeholder').toString() })
@@ -205,6 +232,7 @@ struct Index {
           .padding({ left: 12, right: 12 })
           .backgroundColor(tc('color_surface_alt'))
           .borderRadius(20)
+          .accessibilityText('消息输入框')
           .onChange((value: string) => {
             this.inputText = value;
             this.viewModel.inputText = value;
@@ -221,6 +249,7 @@ struct Index {
           .borderRadius(20)
           .margin({ left: 8 })
           .enabled(this.viewModel.canSend && this.inputText.trim().length > 0 && this.viewModel.voiceState === VoiceState.IDLE)
+          .accessibilityText('发送消息')
           .onClick(() => this.sendMessage())
       }
       .width('100%')
@@ -230,6 +259,12 @@ struct Index {
     .width('100%')
     .height('100%')
     .backgroundColor(tc('color_background'))
+    .onKeyboardHeightChange((height: number) => {
+      if (height > 0) {
+        // 键盘弹出时自动滚底
+        this.scrollToEnd();
+      }
+    })
 
     // Context menu overlay
     if (this.showContextMenu && this.contextMenuMessage) {
@@ -248,9 +283,7 @@ struct Index {
 
   @Builder
   buildVoiceButton() {
-    // Voice button with 3 states
     if (this.viewModel.isRecording) {
-      // Recording state: red stop button
       Button('⏹')
         .width(40)
         .height(40)
@@ -259,6 +292,7 @@ struct Index {
         .backgroundColor(tc('color_error'))
         .borderRadius(20)
         .margin({ right: 8 })
+        .accessibilityText('停止录音')
         .onClick(() => {
           this.viewModel.stopVoiceRecording();
         })
@@ -269,7 +303,6 @@ struct Index {
             })
         )
     } else if (this.viewModel.isVoiceProcessing) {
-      // Processing state: disabled button with spinner
       Button() {
         LoadingProgress()
           .width(20)
@@ -282,8 +315,8 @@ struct Index {
       .borderRadius(20)
       .margin({ right: 8 })
       .enabled(false)
+      .accessibilityText('语音处理中')
     } else if (this.viewModel.isVoicePlaying) {
-      // Playing state: stop button
       Button('🔊')
         .width(40)
         .height(40)
@@ -292,11 +325,11 @@ struct Index {
         .backgroundColor(tc('color_warning'))
         .borderRadius(20)
         .margin({ right: 8 })
+        .accessibilityText('停止播放')
         .onClick(() => {
           this.viewModel.stopSpeaking();
         })
     } else {
-      // Idle state: microphone button
       Button('🎤')
         .width(40)
         .height(40)
@@ -306,6 +339,7 @@ struct Index {
         .borderRadius(20)
         .margin({ right: 8 })
         .enabled(this.viewModel.canUseVoice)
+        .accessibilityText('语音输入')
         .onClick(() => {
           this.viewModel.startVoiceRecording();
         })
@@ -331,6 +365,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('复制消息')
             .onClick(() => {
               this.copyText(this.contextMenuMessage!.text);
               this.showContextMenu = false;
@@ -345,6 +380,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('引用回复')
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
               this.showContextMenu = false;
@@ -360,6 +396,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('语音播报')
             .onClick(() => {
               this.viewModel.speakText(this.contextMenuMessage!.text);
               this.showContextMenu = false;
@@ -375,6 +412,7 @@ struct Index {
               .textAlign(TextAlign.Center)
               .fontColor(tc('color_accent'))
               .padding({ top: 14, bottom: 14 })
+              .accessibilityText('重新发送')
               .onClick(() => {
                 this.viewModel.retry(this.contextMenuMessage!.id);
                 this.showContextMenu = false;
@@ -389,6 +427,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_error'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('删除消息')
             .onClick(() => {
               this.viewModel.deleteMessage(this.contextMenuMessage!.id);
               this.showContextMenu = false;
@@ -401,6 +440,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('复制消息')
             .onClick(() => {
               this.copyText(this.contextMenuMessage!.text);
               this.showContextMenu = false;
@@ -415,6 +455,7 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('引用回复')
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
               this.showContextMenu = false;
@@ -430,8 +471,42 @@ struct Index {
             .textAlign(TextAlign.Center)
             .fontColor(tc('color_text_primary'))
             .padding({ top: 14, bottom: 14 })
+            .accessibilityText('语音播报')
             .onClick(() => {
               this.viewModel.speakText(this.contextMenuMessage!.text);
+              this.showContextMenu = false;
+            })
+
+          Divider()
+            .color(tc('color_divider'))
+
+          // 重新生成选项
+          if (this.isLastAssistantMessage(this.contextMenuMessage!)) {
+            Text('重新生成')
+              .fontSize(16)
+              .width('100%')
+              .textAlign(TextAlign.Center)
+              .fontColor(tc('color_accent'))
+              .padding({ top: 14, bottom: 14 })
+              .accessibilityText('重新生成回复')
+              .onClick(() => {
+                this.viewModel.regenerateLastResponse();
+                this.showContextMenu = false;
+              })
+
+            Divider()
+              .color(tc('color_divider'))
+          }
+
+          Text($r('app.string.btn_delete'))
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .fontColor(tc('color_error'))
+            .padding({ top: 14, bottom: 14 })
+            .accessibilityText('删除消息')
+            .onClick(() => {
+              this.viewModel.deleteMessage(this.contextMenuMessage!.id);
               this.showContextMenu = false;
             })
         }
@@ -451,13 +526,12 @@ struct Index {
 
     const quotedId = this.quotingMessage?.id;
     const quotedText = this.quotingMessage?.text;
-    this.viewModel.send(this.inputText, quotedId, quotedText);
+    this.viewModel.sendStreaming(this.inputText, quotedId, quotedText);
     this.inputText = '';
     this.quotingMessage = null;
   }
 
   private copyText(text: string): void {
-    // ArkTS clipboard API
     import { systemPasteboard } from '@kit.BasicServicesKit';
     systemPasteboard.setData(systemPasteboard.MIMETYPE_TEXT_PLAINTEXT, text, (err) => {
       if (err) {

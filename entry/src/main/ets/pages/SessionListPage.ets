@@ -1,4 +1,4 @@
-// SessionListPage.ets — 会话列表页面（新建/切换/删除/搜索/重命名）
+// SessionListPage.ets — 会话列表页面（新建/切换/删除/搜索/重命名 + 无障碍）
 import { SessionManager } from '../service/SessionManager';
 import { ChatSession } from '../common/ChatTypes';
 
@@ -35,6 +35,7 @@ struct SessionListPage {
         Text('返回')
           .fontSize(16)
           .fontColor('#4A90D9')
+          .accessibilityText('返回上一页')
           .onClick(() => router.back())
 
         Blank()
@@ -51,6 +52,7 @@ struct SessionListPage {
           .fontSize(24)
           .fontColor('#4A90D9')
           .fontWeight(FontWeight.Bold)
+          .accessibilityText('新建会话')
           .onClick(() => this.onCreateSession())
       }
       .width('100%')
@@ -68,6 +70,7 @@ struct SessionListPage {
           .padding({ left: 12, right: 12 })
           .backgroundColor('#F0F0F0')
           .borderRadius(18)
+          .accessibilityText('搜索会话')
           .onChange((value: string) => {
             this.searchKeyword = value;
             this.refreshList();
@@ -78,6 +81,7 @@ struct SessionListPage {
             .fontSize(14)
             .fontColor('#4A90D9')
             .margin({ left: 8 })
+            .accessibilityText('取消搜索')
             .onClick(() => {
               this.searchKeyword = '';
               this.refreshList();
@@ -186,6 +190,7 @@ struct SessionListPage {
     .width('100%')
     .padding({ left: 16, right: 16, top: 12, bottom: 12 })
     .backgroundColor('#FFFFFF')
+    .accessibilityText(`会话：${session.title}，${session.lastMessagePreview || '暂无消息'}`)
     .onClick(() => this.onSelectSession(session.id))
     .gesture(
       LongPressGesture({ repeat: false })
@@ -206,6 +211,7 @@ struct SessionListPage {
       .fontColor('#FFFFFF')
       .backgroundColor('#FF4444')
       .borderRadius(0)
+      .accessibilityText(`删除会话 ${session.title}`)
       .onClick(() => this.onDeleteSession(session.id))
   }
 
@@ -233,6 +239,7 @@ struct SessionListPage {
           .padding({ left: 12, right: 12 })
           .backgroundColor('#F5F5F5')
           .borderRadius(8)
+          .accessibilityText('会话名称输入框')
           .onChange((v: string) => this.renameInput = v)
 
         Row({ space: 12 }) {
@@ -243,6 +250,7 @@ struct SessionListPage {
             .fontColor('#666666')
             .backgroundColor('#F0F0F0')
             .borderRadius(8)
+            .accessibilityText('取消重命名')
             .onClick(() => this.showRenameDialog = false)
 
           Button('确定')
@@ -252,6 +260,7 @@ struct SessionListPage {
             .fontColor('#FFFFFF')
             .backgroundColor('#4A90D9')
             .borderRadius(8)
+            .accessibilityText('确认重命名')
             .onClick(() => this.onConfirmRename())
         }
         .width('100%')

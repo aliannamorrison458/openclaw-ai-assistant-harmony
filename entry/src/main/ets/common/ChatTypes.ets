@@ -10,7 +10,8 @@ export enum SendStatus {
 export enum MessageType {
   TEXT = 'text',        // 文本消息
   VOICE = 'voice',      // 语音消息
-  SYSTEM = 'system'     // 系统消息
+  SYSTEM = 'system',    // 系统消息
+  IMAGE = 'image'       // 图片消息
 }
 
 export interface ChatMessage {
@@ -25,9 +26,11 @@ export interface ChatMessage {
   quotedMessageId?: string;
   quotedText?: string;
   imageData?: string;    // base64 encoded image
+  imageUri?: string;     // image file path
   messageType?: MessageType; // 消息类型
   voiceDuration?: number; // 语音消息时长（秒）
   voicePath?: string;     // 语音文件路径
+  thinkingContent?: string; // Thinking 推理过程内容
 }
 
 export interface ChatSession {
@@ -99,4 +102,20 @@ export function createVoiceMessage(text: string, isUser: boolean, voiceDuration?
 
 function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+}
+
+export function createImageMessage(imageData: string, imageUri: string, text: string = '', isUser: boolean = true): ChatMessage {
+  return {
+    id: generateId(),
+    text: text || '[图片]',
+    isUser: isUser,
+    sendStatus: isUser ? SendStatus.SENDING : SendStatus.NONE,
+    createdAt: Date.now(),
+    isDegraded: false,
+    isRead: false,
+    isRecalled: false,
+    messageType: MessageType.IMAGE,
+    imageData: imageData,
+    imageUri: imageUri
+  };
 }
