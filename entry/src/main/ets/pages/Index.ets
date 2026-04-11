@@ -1,7 +1,8 @@
-// Index.ets — 聊天主页面（对齐 iOS ChatView）
+// Index.ets — 聊天主页面（集成语音输入和播报功能）
 import { ChatViewModel } from '../viewmodel/ChatViewModel';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
+import { VoiceState } from '../service/VoiceServiceManager';
 
 @Entry
 @Component
@@ -17,6 +18,7 @@ struct Index {
     this.viewModel.onUpdate(() => {
       // Trigger re-render by updating state
       this.showOfflineBanner = this.viewModel.isOffline;
+      this.inputText = this.viewModel.inputText;
     });
   }
 
@@ -37,6 +39,13 @@ struct Index {
             .fontSize(12)
             .fontColor('#FFFFFF')
             .backgroundColor('#FF9800')
+            .padding({ top: 2, bottom: 2, left: 8, right: 8 })
+            .borderRadius(10)
+        } else if (this.viewModel.isWeakNetwork) {
+          Text('弱网')
+            .fontSize(12)
+            .fontColor('#FFFFFF')
+            .backgroundColor('#FFC107')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
         }
@@ -69,6 +78,54 @@ struct Index {
         .justifyContent(FlexAlign.Center)
         .padding({ top: 6, bottom: 6 })
         .backgroundColor('#FF9800')
+        .animation({ duration: 250, curve: Curve.EaseInOut })
+      }
+
+      // Voice offline warning banner
+      if (this.viewModel.voiceOfflineWarning) {
+        Row() {
+          Text(this.viewModel.voiceOfflineWarning)
+            .fontSize(13)
+            .fontColor('#FFFFFF')
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .padding({ top: 6, bottom: 6 })
+        .backgroundColor('#F44336')
+        .animation({ duration: 250, curve: Curve.EaseInOut })
+      }
+
+      // Voice state indicator (recording / processing / playing)
+      if (this.viewModel.voiceState !== VoiceState.IDLE) {
+        Row() {
+          // Animated indicator based on state
+          if (this.viewModel.isRecording) {
+            // Recording indicator: pulsing red dot
+            Text('🔴')
+              .fontSize(14)
+              .animation({ duration: 500, iterations: -1, playMode: PlayMode.Alternate })
+          } else if (this.viewModel.isVoiceProcessing) {
+            // Processing indicator: spinner
+            LoadingProgress()
+              .width(16)
+              .height(16)
+              .color('#4A90D9')
+          } else if (this.viewModel.isVoicePlaying) {
+            // Playing indicator: speaker
+            Text('🔊')
+              .fontSize(14)
+          }
+
+          Text(this.viewModel.voiceStateText)
+            .fontSize(13)
+            .fontColor('#4A90D9')
+            .margin({ left: 8 })
+            .fontWeight(FontWeight.Medium)
+        }
+        .width('100%')
+        .justifyContent(FlexAlign.Center)
+        .padding({ top: 6, bottom: 6 })
+        .backgroundColor('#E3F2FD')
         .animation({ duration: 250, curve: Curve.EaseInOut })
       }
 
@@ -130,6 +187,9 @@ struct Index {
 
       // Input area
       Row() {
+        // Voice button - changes state based on current activity
+        this.buildVoiceButton()
+
         TextInput({ text: this.inputText, placeholder: '输入消息...' })
           .layoutWeight(1)
           .height(40)
@@ -137,8 +197,12 @@ struct Index {
           .padding({ left: 12, right: 12 })
           .backgroundColor('#F5F5F5')
           .borderRadius(20)
-          .onChange((value: string) => this.inputText = value)
+          .onChange((value: string) => {
+            this.inputText = value;
+            this.viewModel.inputText = value;
+          })
           .onSubmit(() => this.sendMessage())
+          .enabled(this.viewModel.voiceState === VoiceState.IDLE)
 
         Button('发送')
           .width(60)
@@ -148,7 +212,7 @@ struct Index {
           .backgroundColor(this.viewModel.canSend && this.inputText.trim() ? '#4A90D9' : '#CCCCCC')
           .borderRadius(20)
           .margin({ left: 8 })
-          .enabled(this.viewModel.canSend && this.inputText.trim().length > 0)
+          .enabled(this.viewModel.canSend && this.inputText.trim().length > 0 && this.viewModel.voiceState === VoiceState.IDLE)
           .onClick(() => this.sendMessage())
       }
       .width('100%')
@@ -162,6 +226,72 @@ struct Index {
     // Context menu overlay
     if (this.showContextMenu && this.contextMenuMessage) {
       this.buildContextMenu()
+    }
+  }
+
+  @Builder
+  buildVoiceButton() {
+    // Voice button with 3 states
+    if (this.viewModel.isRecording) {
+      // Recording state: red stop button
+      Button('⏹')
+        .width(40)
+        .height(40)
+        .fontSize(18)
+        .fontColor('#FFFFFF')
+        .backgroundColor('#F44336')
+        .borderRadius(20)
+        .margin({ right: 8 })
+        .onClick(() => {
+          this.viewModel.stopVoiceRecording();
+        })
+        .gesture(
+          LongPressGesture({ repeat: false })
+            .onAction(() => {
+              this.viewModel.cancelVoiceRecording();
+            })
+        )
+    } else if (this.viewModel.isVoiceProcessing) {
+      // Processing state: disabled button with spinner
+      Button() {
+        LoadingProgress()
+          .width(20)
+          .height(20)
+          .color('#FFFFFF')
+      }
+      .width(40)
+      .height(40)
+      .backgroundColor('#CCCCCC')
+      .borderRadius(20)
+      .margin({ right: 8 })
+      .enabled(false)
+    } else if (this.viewModel.isVoicePlaying) {
+      // Playing state: stop button
+      Button('🔊')
+        .width(40)
+        .height(40)
+        .fontSize(18)
+        .fontColor('#FFFFFF')
+        .backgroundColor('#FF9800')
+        .borderRadius(20)
+        .margin({ right: 8 })
+        .onClick(() => {
+          this.viewModel.stopSpeaking();
+        })
+    } else {
+      // Idle state: microphone button
+      Button('🎤')
+        .width(40)
+        .height(40)
+        .fontSize(18)
+        .fontColor('#FFFFFF')
+        .backgroundColor(this.viewModel.canUseVoice ? '#4A90D9' : '#CCCCCC')
+        .borderRadius(20)
+        .margin({ right: 8 })
+        .enabled(this.viewModel.canUseVoice)
+        .onClick(() => {
+          this.viewModel.startVoiceRecording();
+        })
     }
   }
 
@@ -197,6 +327,19 @@ struct Index {
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
+              this.showContextMenu = false;
+            })
+
+          Divider()
+
+          // 语音播报选项
+          Text('语音播报')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.viewModel.speakText(this.contextMenuMessage!.text);
               this.showContextMenu = false;
             })
 
@@ -247,6 +390,19 @@ struct Index {
             .padding({ top: 14, bottom: 14 })
             .onClick(() => {
               this.quotingMessage = this.contextMenuMessage;
+              this.showContextMenu = false;
+            })
+
+          Divider()
+
+          // 语音播报选项
+          Text('语音播报')
+            .fontSize(16)
+            .width('100%')
+            .textAlign(TextAlign.Center)
+            .padding({ top: 14, bottom: 14 })
+            .onClick(() => {
+              this.viewModel.speakText(this.contextMenuMessage!.text);
               this.showContextMenu = false;
             })
         }

@@ -1,12 +1,13 @@
-// ChatViewModel.ets — 聊天 ViewModel（对齐 iOS ChatViewModel）
+// ChatViewModel.ets — 聊天 ViewModel（集成语音功能）
 import { ChatMessage, SendStatus, createUserId, createAssistantMessage, createSystemMessage } from '../common/ChatTypes';
 import { LLMClient, MockLLMClient, LLMConfig } from '../service/LLMClient';
-import { NetworkMonitor, ConnectionType } from '../service/NetworkMonitor';
+import { NetworkMonitor, ConnectionType, NetworkQuality } from '../service/NetworkMonitor';
+import { VoiceServiceManager, VoiceState } from '../service/VoiceServiceManager';
 import { preferences } from '@kit.ArkData';
 
 const PREF_NAME = 'ai_assistant_prefs';
 const KEY_API_BASE = 'api_base_url';
-const KEY_API_TOKEN = 'api_token';
+const KEY_API_TOKEN='***';
 const KEY_USE_MOCK = 'use_mock';
 const KEY_MODEL = 'model_name';
 
@@ -14,12 +15,21 @@ export class ChatViewModel {
   messages: ChatMessage[] = [];
   isOffline: boolean = false;
   isDegraded: boolean = false;
+  isWeakNetwork: boolean = false;
   inputText: string = '';
+
+  // 语音相关状态
+  voiceState: VoiceState = VoiceState.IDLE;
+  isRecording: boolean = false;
+  isVoicePlaying: boolean = false;
+  isVoiceProcessing: boolean = false;
+  voiceOfflineWarning: string = '';
 
   private llmClient: LLMClient;
   private mockClient: MockLLMClient;
   private useMock: boolean = true;
   private networkMonitor: NetworkMonitor;
+  private voiceManager: VoiceServiceManager;
   private prefStore: preferences.Preferences | null = null;
   private _onUpdate: (() => void) | null = null;
 
@@ -27,6 +37,7 @@ export class ChatViewModel {
     this.llmClient = new LLMClient();
     this.mockClient = new MockLLMClient();
     this.networkMonitor = NetworkMonitor.getInstance();
+    this.voiceManager = VoiceServiceManager.getInstance();
     this._init();
   }
 
@@ -62,15 +73,90 @@ export class ChatViewModel {
 
     // Start network monitoring
     this.networkMonitor.start();
-    this.networkMonitor.addListener((connected, type) => {
+    this.networkMonitor.addListener((connected: boolean, type: ConnectionType, quality: NetworkQuality) => {
       this.isOffline = !connected;
       this.isDegraded = !connected;
+      this.isWeakNetwork = quality === NetworkQuality.WEAK;
       this._notify();
+    });
+
+    // 初始化语音管理器回调
+    this.voiceManager.onStateChange((state: VoiceState) => {
+      this.voiceState = state;
+      this.isRecording = state === VoiceState.RECORDING;
+      this.isVoiceProcessing = state === VoiceState.PROCESSING;
+      this.isVoicePlaying = state === VoiceState.PLAYING;
+      this._notify();
+    });
+
+    this.voiceManager.onSTTResult((text: string) => {
+      // STT 结果自动填入输入框
+      this.inputText = text;
+      this._notify();
+    });
+
+    this.voiceManager.onError((error: string) => {
+      this.messages.push(createSystemMessage(`语音错误: ${error}`));
+      this._notify();
+    });
+
+    this.voiceManager.onOfflineWarning((message: string) => {
+      this.voiceOfflineWarning = message;
+      this._notify();
+      // 3秒后自动清除
+      setTimeout(() => {
+        this.voiceOfflineWarning = '';
+        this._notify();
+      }, 3000);
     });
   }
 
   get canSend(): boolean {
     return !this.messages.some(m => m.isUser && m.sendStatus === SendStatus.SENDING);
+  }
+
+  // 语音相关方法
+  get canUseVoice(): boolean {
+    return !this.isOffline && this.voiceState === VoiceState.IDLE;
+  }
+
+  get voiceStateText(): string {
+    switch (this.voiceState) {
+      case VoiceState.RECORDING: return '录音中...';
+      case VoiceState.PROCESSING: return '处理中...';
+      case VoiceState.PLAYING: return '播放中...';
+      default: return '';
+    }
+  }
+
+  startVoiceRecording(): void {
+    if (this.isOffline) {
+      this.messages.push(createSystemMessage('⚠️ 网络已断开，无法使用语音功能'));
+      this._notify();
+      return;
+    }
+    this.voiceManager.startRecording();
+  }
+
+  stopVoiceRecording(): void {
+    this.voiceManager.stopRecordingAndTranscribe();
+  }
+
+  cancelVoiceRecording(): void {
+    this.voiceManager.cancelRecording();
+  }
+
+  speakText(text: string): void {
+    if (this.isOffline) {
+      this.messages.push(createSystemMessage('⚠️ 网络已断开，语音播报暂不可用'));
+      this._notify();
+      return;
+    }
+    this.voiceManager.speak(text);
+  }
+
+  stopSpeaking(): void {
+    this.voiceManager.stopSpeaking();
   }
 
   send(text: string, quotedMessageId?: string, quotedText?: string): void {

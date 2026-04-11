@@ -7,6 +7,12 @@ export enum SendStatus {
   FAILED = 'failed'    // 发送失败
 }
 
+export enum MessageType {
+  TEXT = 'text',        // 文本消息
+  VOICE = 'voice',      // 语音消息
+  SYSTEM = 'system'     // 系统消息
+}
+
 export interface ChatMessage {
   id: string;
   text: string;
@@ -19,6 +25,9 @@ export interface ChatMessage {
   quotedMessageId?: string;
   quotedText?: string;
   imageData?: string;    // base64 encoded image
+  messageType?: MessageType; // 消息类型
+  voiceDuration?: number; // 语音消息时长（秒）
+  voicePath?: string;     // 语音文件路径
 }
 
 export interface ChatSession {
@@ -39,7 +48,8 @@ export function createUserId(text: string): ChatMessage {
     createdAt: Date.now(),
     isDegraded: false,
     isRead: false,
-    isRecalled: false
+    isRecalled: false,
+    messageType: MessageType.TEXT
   };
 }
 
@@ -52,7 +62,8 @@ export function createAssistantMessage(text: string): ChatMessage {
     createdAt: Date.now(),
     isDegraded: false,
     isRead: false,
-    isRecalled: false
+    isRecalled: false,
+    messageType: MessageType.TEXT
   };
 }
 
@@ -65,7 +76,24 @@ export function createSystemMessage(text: string): ChatMessage {
     createdAt: Date.now(),
     isDegraded: false,
     isRead: false,
-    isRecalled: false
+    isRecalled: false,
+    messageType: MessageType.SYSTEM
+  };
+}
+
+export function createVoiceMessage(text: string, isUser: boolean, voiceDuration?: number, voicePath?: string): ChatMessage {
+  return {
+    id: generateId(),
+    text: text,
+    isUser: isUser,
+    sendStatus: isUser ? SendStatus.SENDING : SendStatus.NONE,
+    createdAt: Date.now(),
+    isDegraded: false,
+    isRead: false,
+    isRecalled: false,
+    messageType: MessageType.VOICE,
+    voiceDuration: voiceDuration,
+    voicePath: voicePath
   };
 }
 

@@ -1,4 +1,4 @@
-// MessageBubble.ets — 消息气泡组件
+// MessageBubble.ets — 消息气泡组件（集成语音播报按钮）
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
 
 @Component
@@ -6,6 +6,7 @@ export struct MessageBubble {
   message: ChatMessage = {} as ChatMessage;
   onRetry: () => void = () => {};
   onLongPress: (msg: ChatMessage) => void = () => {};
+  onSpeak: (text: string) => void = () => {};
 
   private formatTime(timestamp: number): string {
     const date = new Date(timestamp);
@@ -66,7 +67,7 @@ export struct MessageBubble {
             .fontColor(this.message.isUser ? '#FFFFFF' : '#1A1A1A')
             .padding({ top: 8, bottom: 8, left: 12, right: 12 })
 
-          // Timestamp + status
+          // Timestamp + status + voice button
           Row() {
             Text(this.formatTime(this.message.createdAt))
               .fontSize(11)
@@ -93,8 +94,19 @@ export struct MessageBubble {
                 .fontColor('#FF9800')
                 .margin({ left: 4 })
             }
+
+            Blank()
+
+            // Voice playback button for assistant messages
+            if (!this.message.isUser && this.message.sendStatus === SendStatus.NONE) {
+              Text('🔊')
+                .fontSize(14)
+                .margin({ right: 4 })
+                .onClick(() => this.onSpeak(this.message.text))
+            }
           }
           .margin({ top: 4 })
+          .width('100%')
         }
         .width('70%')
         .backgroundColor(this.message.isUser ? '#4A90D9' : '#F0F0F0')
