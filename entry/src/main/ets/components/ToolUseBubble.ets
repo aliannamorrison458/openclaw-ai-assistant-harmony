@@ -6,12 +6,20 @@ export struct ToolUseBubble {
   toolData: ToolUseData = {} as ToolUseData;
   messageType: MessageType = MessageType.TOOL_USE;
 
+  // i18n string props
+  statusExecuting: string = '执行中...';
+  statusCompleted: string = '已完成';
+  statusError: string = '执行出错';
+  paramsLabel: string = '📋 参数';
+  resultLabel: string = '📝 执行结果';
+  errorResultLabel: string = '❌ 错误结果';
+  moreItemsSuffix: string = '个';
+
   @State expanded: boolean = false;
 
   // 格式化 JSON 参数（带缩进 + 截断）
   private formatParams(json: string): string {
     try {
-      // 尝试格式化 JSON
       const obj = JSON.parse(json);
       const formatted = JSON.stringify(obj, null, 2);
       if (formatted.length > 300) {
@@ -46,9 +54,9 @@ export struct ToolUseBubble {
   // 状态文案
   private getStatusText(): string {
     switch (this.toolData.status) {
-      case 'running': return '执行中...';
-      case 'completed': return '已完成';
-      case 'error': return '执行出错';
+      case 'running': return this.statusExecuting;
+      case 'completed': return this.statusCompleted;
+      case 'error': return this.statusError;
       default: return '';
     }
   }
@@ -84,7 +92,7 @@ export struct ToolUseBubble {
           : JSON.stringify(obj[key]);
         previews.push(`${key}: ${val}`);
       }
-      if (keys.length > 3) previews.push(`...+${keys.length - 3}个`);
+      if (keys.length > 3) previews.push(`...+${keys.length - 3}${this.moreItemsSuffix}`);
       return previews.join(', ');
     } catch (e) {
       if (this.toolData.paramsJson.length > 80) {
@@ -172,7 +180,7 @@ export struct ToolUseBubble {
       if (this.expanded) {
         // 参数详情
         Column() {
-          Text('📋 参数')
+          Text(this.paramsLabel)
             .fontSize(12)
             .fontWeight(FontWeight.Bold)
             .fontColor('#666666')
@@ -208,7 +216,7 @@ export struct ToolUseBubble {
         // 结果详情
         if (this.toolData.resultSummary) {
           Column() {
-            Text(this.toolData.status === 'error' ? '❌ 错误结果' : '📝 执行结果')
+            Text(this.toolData.status === 'error' ? this.errorResultLabel : this.resultLabel)
               .fontSize(12)
               .fontWeight(FontWeight.Bold)
               .fontColor(this.toolData.status === 'error' ? '#F44336' : '#666666')

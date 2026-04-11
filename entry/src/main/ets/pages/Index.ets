@@ -1,4 +1,4 @@
-// Index.ets — 聊天主页面（集成语音输入 + 多会话管理）
+// Index.ets — 聊天主页面（集成语音输入和播报功能）
 import { ChatViewModel } from '../viewmodel/ChatViewModel';
 import { MessageBubble } from '../components/MessageBubble';
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
@@ -13,61 +13,47 @@ struct Index {
   @State quotingMessage: ChatMessage | null = null;
   @State showContextMenu: boolean = false;
   @State contextMenuMessage: ChatMessage | null = null;
-  @State sessionTitle: string = '新对话';
 
   aboutToAppear() {
     this.viewModel.onUpdate(() => {
+      // Trigger re-render by updating state
       this.showOfflineBanner = this.viewModel.isOffline;
       this.inputText = this.viewModel.inputText;
-      this.sessionTitle = this.viewModel.currentSessionTitle;
     });
   }
 
   build() {
     Column() {
-      // Navigation bar — 显示当前会话名称 + 左侧会话列表入口
+      // Navigation bar
       Row() {
-        // 左侧按钮：打开会话列表
-        Text('☰')
-          .fontSize(22)
-          .fontColor('#4A90D9')
-          .margin({ right: 12 })
-          .onClick(() => {
-            router.pushUrl({ url: 'pages/SessionListPage' });
-          })
-
-        // 会话标题
-        Text(this.sessionTitle)
-          .fontSize(18)
+        Text($r('app.string.nav_title'))
+          .fontSize(20)
           .fontWeight(FontWeight.Bold)
           .fontColor('#1A1A1A')
-          .maxLines(1)
-          .textOverflow({ overflow: TextOverflow.Ellipsis })
-          .layoutWeight(1)
+
+        Blank()
 
         // Network status indicator
         if (this.showOfflineBanner) {
-          Text('离线')
+          Text($r('app.string.offline_badge'))
             .fontSize(12)
             .fontColor('#FFFFFF')
             .backgroundColor('#FF9800')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
-            .margin({ right: 8 })
         } else if (this.viewModel.isWeakNetwork) {
-          Text('弱网')
+          Text($r('app.string.weak_network_badge'))
             .fontSize(12)
             .fontColor('#FFFFFF')
             .backgroundColor('#FFC107')
             .padding({ top: 2, bottom: 2, left: 8, right: 8 })
             .borderRadius(10)
-            .margin({ right: 8 })
         }
 
         // Settings button
         Text('⚙️')
           .fontSize(22)
-          .margin({ left: 4 })
+          .margin({ left: 12 })
           .onClick(() => {
             router.pushUrl({ url: 'pages/SettingsPage' });
           })
@@ -83,7 +69,7 @@ struct Index {
         Row() {
           Text('📶')
             .fontSize(14)
-          Text('网络已断开，消息将暂停发送')
+          Text($r('app.string.offline_banner'))
             .fontSize(13)
             .fontColor('#FFFFFF')
             .margin({ left: 6 })
@@ -112,21 +98,25 @@ struct Index {
       // Voice state indicator (recording / processing / playing)
       if (this.viewModel.voiceState !== VoiceState.IDLE) {
         Row() {
+          // Animated indicator based on state
           if (this.viewModel.isRecording) {
+            // Recording indicator: pulsing red dot
             Text('🔴')
               .fontSize(14)
               .animation({ duration: 500, iterations: -1, playMode: PlayMode.Alternate })
           } else if (this.viewModel.isVoiceProcessing) {
+            // Processing indicator: spinner
             LoadingProgress()
               .width(16)
               .height(16)
               .color('#4A90D9')
           } else if (this.viewModel.isVoicePlaying) {
+            // Playing indicator: speaker
             Text('🔊')
               .fontSize(14)
           }
 
-          Text(this.viewModel.voiceStateText)
+          Text(this.getVoiceStateText())
             .fontSize(13)
             .fontColor('#4A90D9')
             .margin({ left: 8 })
@@ -149,7 +139,11 @@ struct Index {
               onLongPress: (m: ChatMessage) => {
                 this.contextMenuMessage = m;
                 this.showContextMenu = true;
-              }
+              },
+              quoteAssistantLabel: $r('app.string.quote_assistant').toString(),
+              quoteYouLabel: $r('app.string.quote_you').toString(),
+              retryLabel: $r('app.string.btn_retry').toString(),
+              offlineLabel: $r('app.string.msg_offline').toString()
             })
           }
         }, (msg: ChatMessage) => msg.id)
@@ -158,6 +152,9 @@ struct Index {
       .layoutWeight(1)
       .padding({ left: 12, right: 12, top: 8 })
       .scrollBar(BarState.Off)
+      .onScrollIndex((start: number, end: number) => {
+        // Auto-scroll handled by List
+      })
 
       // Quoting preview bar
       if (this.quotingMessage) {
@@ -168,7 +165,7 @@ struct Index {
             .color('#4A90D9')
 
           Column() {
-            Text(this.quotingMessage.isUser ? '回复自己' : '回复助手')
+            Text(this.quotingMessage.isUser ? $r('app.string.quote_self') : $r('app.string.quote_assistant'))
               .fontSize(12)
               .fontWeight(FontWeight.Bold)
               .fontColor('#4A90D9')
@@ -194,9 +191,10 @@ struct Index {
 
       // Input area
       Row() {
+        // Voice button - changes state based on current activity
         this.buildVoiceButton()
 
-        TextInput({ text: this.inputText, placeholder: '输入消息...' })
+        TextInput({ text: this.inputText, placeholder: $r('app.string.input_placeholder').toString() })
           .layoutWeight(1)
           .height(40)
           .fontSize(15)
@@ -210,7 +208,7 @@ struct Index {
           .onSubmit(() => this.sendMessage())
           .enabled(this.viewModel.voiceState === VoiceState.IDLE)
 
-        Button('发送')
+        Button($r('app.string.btn_send'))
           .width(60)
           .height(40)
           .fontSize(15)
@@ -235,9 +233,20 @@ struct Index {
     }
   }
 
+  private getVoiceStateText(): string {
+    switch (this.viewModel.voiceState) {
+      case VoiceState.RECORDING: return $r('app.string.voice_recording').toString();
+      case VoiceState.PROCESSING: return $r('app.string.voice_processing').toString();
+      case VoiceState.PLAYING: return $r('app.string.voice_playing').toString();
+      default: return '';
+    }
+  }
+
   @Builder
   buildVoiceButton() {
+    // Voice button with 3 states
     if (this.viewModel.isRecording) {
+      // Recording state: red stop button
       Button('⏹')
         .width(40)
         .height(40)
@@ -256,6 +265,7 @@ struct Index {
             })
         )
     } else if (this.viewModel.isVoiceProcessing) {
+      // Processing state: disabled button with spinner
       Button() {
         LoadingProgress()
           .width(20)
@@ -269,6 +279,7 @@ struct Index {
       .margin({ right: 8 })
       .enabled(false)
     } else if (this.viewModel.isVoicePlaying) {
+      // Playing state: stop button
       Button('🔊')
         .width(40)
         .height(40)
@@ -281,6 +292,7 @@ struct Index {
           this.viewModel.stopSpeaking();
         })
     } else {
+      // Idle state: microphone button
       Button('🎤')
         .width(40)
         .height(40)
@@ -299,15 +311,17 @@ struct Index {
   @Builder
   buildContextMenu() {
     Column() {
+      // Backdrop
       Column()
         .width('100%')
         .height('100%')
         .backgroundColor('rgba(0,0,0,0.3)')
         .onClick(() => this.showContextMenu = false)
 
+      // Menu items
       Column() {
         if (this.contextMenuMessage?.isUser) {
-          Text('复制')
+          Text($r('app.string.btn_copy'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -319,7 +333,7 @@ struct Index {
 
           Divider()
 
-          Text('引用回复')
+          Text($r('app.string.btn_quote_reply'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -331,7 +345,8 @@ struct Index {
 
           Divider()
 
-          Text('语音播报')
+          // 语音播报选项
+          Text($r('app.string.btn_voice_playback'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -344,7 +359,7 @@ struct Index {
           Divider()
 
           if (this.contextMenuMessage?.sendStatus === SendStatus.FAILED) {
-            Text('重新发送')
+            Text($r('app.string.btn_resend'))
               .fontSize(16)
               .width('100%')
               .textAlign(TextAlign.Center)
@@ -357,7 +372,7 @@ struct Index {
             Divider()
           }
 
-          Text('删除')
+          Text($r('app.string.btn_delete'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -368,7 +383,8 @@ struct Index {
               this.showContextMenu = false;
             })
         } else {
-          Text('复制')
+          // Assistant message
+          Text($r('app.string.btn_copy'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -380,7 +396,7 @@ struct Index {
 
           Divider()
 
-          Text('引用回复')
+          Text($r('app.string.btn_quote_reply'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -392,7 +408,8 @@ struct Index {
 
           Divider()
 
-          Text('语音播报')
+          // 语音播报选项
+          Text($r('app.string.btn_voice_playback'))
             .fontSize(16)
             .width('100%')
             .textAlign(TextAlign.Center)
@@ -424,6 +441,7 @@ struct Index {
   }
 
   private copyText(text: string): void {
+    // ArkTS clipboard API
     import { systemPasteboard } from '@kit.BasicServicesKit';
     systemPasteboard.setData(systemPasteboard.MIMETYPE_TEXT_PLAINTEXT, text, (err) => {
       if (err) {

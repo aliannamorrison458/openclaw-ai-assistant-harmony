@@ -2,103 +2,103 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "AI 助手"
+      "value": "AI Assistant"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "AI 助手主界面"
+      "value": "AI Assistant Main Screen"
     },
     {
       "name": "EntryAbility_label",
-      "value": "AI助手"
+      "value": "AI Assistant"
     },
     {
       "name": "permission_microphone_reason",
-      "value": "需要麦克风权限以支持语音输入功能"
+      "value": "Microphone permission is required for voice input"
     },
     {
       "name": "permission_internet_reason",
-      "value": "需要网络权限以连接AI服务"
+      "value": "Network permission is required to connect to the AI service"
     },
     {
       "name": "app_name",
-      "value": "AI 助手"
+      "value": "AI Assistant"
     },
     {
       "name": "nav_title",
-      "value": "AI 助手"
+      "value": "AI Assistant"
     },
     {
       "name": "offline_badge",
-      "value": "离线"
+      "value": "Offline"
     },
     {
       "name": "weak_network_badge",
-      "value": "弱网"
+      "value": "Weak"
     },
     {
       "name": "offline_banner",
-      "value": "网络已断开，消息将暂停发送"
+      "value": "Network disconnected, messages will be paused"
     },
     {
       "name": "input_placeholder",
-      "value": "输入消息..."
+      "value": "Type a message..."
     },
     {
       "name": "btn_send",
-      "value": "发送"
+      "value": "Send"
     },
     {
       "name": "btn_copy",
-      "value": "复制"
+      "value": "Copy"
     },
     {
       "name": "btn_quote_reply",
-      "value": "引用回复"
+      "value": "Quote Reply"
     },
     {
       "name": "btn_voice_playback",
-      "value": "语音播报"
+      "value": "Read Aloud"
     },
     {
       "name": "btn_resend",
-      "value": "重新发送"
+      "value": "Resend"
     },
     {
       "name": "btn_delete",
-      "value": "删除"
+      "value": "Delete"
     },
     {
       "name": "btn_retry",
-      "value": "重试"
+      "value": "Retry"
     },
     {
       "name": "quote_self",
-      "value": "回复自己"
+      "value": "Reply to self"
     },
     {
       "name": "quote_assistant",
-      "value": "回复助手"
+      "value": "Reply to assistant"
     },
     {
       "name": "quote_you",
-      "value": "回复你"
+      "value": "Reply to you"
     },
     {
       "name": "msg_offline",
-      "value": "离线"
+      "value": "Offline"
     },
     {
       "name": "btn_back",
-      "value": "← 返回"
+      "value": "← Back"
     },
     {
       "name": "settings_title",
-      "value": "设置"
+      "value": "Settings"
     },
     {
       "name": "settings_api_config",
-      "value": "API 配置"
+      "value": "API Configuration"
     },
     {
       "name": "settings_api_base_url",
@@ -110,27 +110,27 @@
     },
     {
       "name": "settings_model",
-      "value": "模型"
+      "value": "Model"
     },
     {
       "name": "settings_mock_mode",
-      "value": "离线模拟模式"
+      "value": "Offline Mock Mode"
     },
     {
       "name": "settings_mock_desc",
-      "value": "开启后使用本地模拟回复，不调用远程 API"
+      "value": "When enabled, uses local mock replies without calling remote API"
     },
     {
       "name": "settings_save",
-      "value": "保存设置"
+      "value": "Save Settings"
     },
     {
       "name": "settings_saved",
-      "value": "✓ 已保存"
+      "value": "✓ Saved"
     },
     {
       "name": "settings_app_info",
-      "value": "AI 助手 v1.0.0"
+      "value": "AI Assistant v1.0.0"
     },
     {
       "name": "settings_platform",
@@ -138,11 +138,11 @@
     },
     {
       "name": "settings_language",
-      "value": "语言"
+      "value": "Language"
     },
     {
       "name": "settings_language_follow_system",
-      "value": "跟随系统"
+      "value": "Follow System"
     },
     {
       "name": "settings_language_zh_cn",
@@ -158,103 +158,103 @@
     },
     {
       "name": "voice_recording",
-      "value": "录音中..."
+      "value": "Recording..."
     },
     {
       "name": "voice_processing",
-      "value": "处理中..."
+      "value": "Processing..."
     },
     {
       "name": "voice_playing",
-      "value": "播放中..."
+      "value": "Playing..."
     },
     {
       "name": "voice_error",
-      "value": "语音错误"
+      "value": "Voice error"
     },
     {
       "name": "voice_network_offline",
-      "value": "⚠️ 网络已断开，无法使用语音功能"
+      "value": "⚠️ Network disconnected, voice function unavailable"
     },
     {
       "name": "voice_playback_offline",
-      "value": "⚠️ 网络已断开，语音播报暂不可用"
+      "value": "⚠️ Network disconnected, voice playback unavailable"
     },
     {
       "name": "voice_offline_warning",
-      "value": "⚠️ 网络已断开，语音功能暂时不可用"
+      "value": "⚠️ Network disconnected, voice features temporarily unavailable"
     },
     {
       "name": "voice_offline_queued",
-      "value": "⚠️ 已离线，语音将稍后处理"
+      "value": "⚠️ Offline, voice will be processed later"
     },
     {
       "name": "voice_offline_tts_queued",
-      "value": "⚠️ 已离线，语音播报将稍后执行"
+      "value": "⚠️ Offline, voice playback will be executed later"
     },
     {
       "name": "voice_recording_failed",
-      "value": "启动录音失败，请检查麦克风权限"
+      "value": "Failed to start recording, please check microphone permission"
     },
     {
       "name": "voice_recording_empty",
-      "value": "录音数据为空"
+      "value": "Recording data is empty"
     },
     {
       "name": "voice_stop_failed",
-      "value": "停止录音失败"
+      "value": "Failed to stop recording"
     },
     {
       "name": "voice_stt_failed",
-      "value": "语音识别失败"
+      "value": "Speech recognition failed"
     },
     {
       "name": "voice_offline_stt_failed",
-      "value": "离线队列语音识别失败"
+      "value": "Offline queue speech recognition failed"
     },
     {
       "name": "voice_tts_failed",
-      "value": "语音播报失败"
+      "value": "Voice playback failed"
     },
     {
       "name": "error_prefix",
-      "value": "错误"
+      "value": "Error"
     },
     {
       "name": "error_unknown",
-      "value": "未知错误"
+      "value": "Unknown error"
     },
     {
       "name": "degraded_mode",
-      "value": "⚠️ 已降级到本地模式"
+      "value": "⚠️ Degraded to local mode"
     },
     {
       "name": "tool_executing",
-      "value": "执行中..."
+      "value": "Running..."
     },
     {
       "name": "tool_completed",
-      "value": "已完成"
+      "value": "Completed"
     },
     {
       "name": "tool_error",
-      "value": "执行出错"
+      "value": "Error"
     },
     {
       "name": "tool_params",
-      "value": "📋 参数"
+      "value": "📋 Parameters"
     },
     {
       "name": "tool_result",
-      "value": "📝 执行结果"
+      "value": "📝 Result"
     },
     {
       "name": "tool_error_result",
-      "value": "❌ 错误结果"
+      "value": "❌ Error Result"
     },
     {
       "name": "tool_more_items",
-      "value": "个"
+      "value": "more"
     }
   ]
 }

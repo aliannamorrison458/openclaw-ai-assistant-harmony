@@ -2,103 +2,103 @@
   "string": [
     {
       "name": "module_desc",
-      "value": "AI 助手"
+      "value": "AI アシスタント"
     },
     {
       "name": "EntryAbility_desc",
-      "value": "AI 助手主界面"
+      "value": "AI アシスタント メイン画面"
     },
     {
       "name": "EntryAbility_label",
-      "value": "AI助手"
+      "value": "AIアシスタント"
     },
     {
       "name": "permission_microphone_reason",
-      "value": "需要麦克风权限以支持语音输入功能"
+      "value": "音声入力機能を利用するにはマイクの許可が必要です"
     },
     {
       "name": "permission_internet_reason",
-      "value": "需要网络权限以连接AI服务"
+      "value": "AIサービスに接続するにはネットワークの許可が必要です"
     },
     {
       "name": "app_name",
-      "value": "AI 助手"
+      "value": "AI アシスタント"
     },
     {
       "name": "nav_title",
-      "value": "AI 助手"
+      "value": "AI アシスタント"
     },
     {
       "name": "offline_badge",
-      "value": "离线"
+      "value": "オフライン"
     },
     {
       "name": "weak_network_badge",
-      "value": "弱网"
+      "value": "弱いネットワーク"
     },
     {
       "name": "offline_banner",
-      "value": "网络已断开，消息将暂停发送"
+      "value": "ネットワークが切断されました。メッセージは一時停止されます"
     },
     {
       "name": "input_placeholder",
-      "value": "输入消息..."
+      "value": "メッセージを入力..."
     },
     {
       "name": "btn_send",
-      "value": "发送"
+      "value": "送信"
     },
     {
       "name": "btn_copy",
-      "value": "复制"
+      "value": "コピー"
     },
     {
       "name": "btn_quote_reply",
-      "value": "引用回复"
+      "value": "引用返信"
     },
     {
       "name": "btn_voice_playback",
-      "value": "语音播报"
+      "value": "音声読み上げ"
     },
     {
       "name": "btn_resend",
-      "value": "重新发送"
+      "value": "再送信"
     },
     {
       "name": "btn_delete",
-      "value": "删除"
+      "value": "削除"
     },
     {
       "name": "btn_retry",
-      "value": "重试"
+      "value": "リトライ"
     },
     {
       "name": "quote_self",
-      "value": "回复自己"
+      "value": "自分に返信"
     },
     {
       "name": "quote_assistant",
-      "value": "回复助手"
+      "value": "アシスタントに返信"
     },
     {
       "name": "quote_you",
-      "value": "回复你"
+      "value": "あなたに返信"
     },
     {
       "name": "msg_offline",
-      "value": "离线"
+      "value": "オフライン"
     },
     {
       "name": "btn_back",
-      "value": "← 返回"
+      "value": "← 戻る"
     },
     {
       "name": "settings_title",
-      "value": "设置"
+      "value": "設定"
     },
     {
       "name": "settings_api_config",
-      "value": "API 配置"
+      "value": "API 設定"
     },
     {
       "name": "settings_api_base_url",
@@ -110,27 +110,27 @@
     },
     {
       "name": "settings_model",
-      "value": "模型"
+      "value": "モデル"
     },
     {
       "name": "settings_mock_mode",
-      "value": "离线模拟模式"
+      "value": "オフラインシミュレーションモード"
     },
     {
       "name": "settings_mock_desc",
-      "value": "开启后使用本地模拟回复，不调用远程 API"
+      "value": "有効にすると、リモートAPIを呼び出さずにローカルの模擬返信を使用します"
     },
     {
       "name": "settings_save",
-      "value": "保存设置"
+      "value": "設定を保存"
     },
     {
       "name": "settings_saved",
-      "value": "✓ 已保存"
+      "value": "✓ 保存しました"
     },
     {
       "name": "settings_app_info",
-      "value": "AI 助手 v1.0.0"
+      "value": "AI アシスタント v1.0.0"
     },
     {
       "name": "settings_platform",
@@ -138,11 +138,11 @@
     },
     {
       "name": "settings_language",
-      "value": "语言"
+      "value": "言語"
     },
     {
       "name": "settings_language_follow_system",
-      "value": "跟随系统"
+      "value": "システムに従う"
     },
     {
       "name": "settings_language_zh_cn",
@@ -158,103 +158,103 @@
     },
     {
       "name": "voice_recording",
-      "value": "录音中..."
+      "value": "録音中..."
     },
     {
       "name": "voice_processing",
-      "value": "处理中..."
+      "value": "処理中..."
     },
     {
       "name": "voice_playing",
-      "value": "播放中..."
+      "value": "再生中..."
     },
     {
       "name": "voice_error",
-      "value": "语音错误"
+      "value": "音声エラー"
     },
     {
       "name": "voice_network_offline",
-      "value": "⚠️ 网络已断开，无法使用语音功能"
+      "value": "⚠️ ネットワークが切断されました。音声機能は使用できません"
     },
     {
       "name": "voice_playback_offline",
-      "value": "⚠️ 网络已断开，语音播报暂不可用"
+      "value": "⚠️ ネットワークが切断されました。音声再生は利用できません"
     },
     {
       "name": "voice_offline_warning",
-      "value": "⚠️ 网络已断开，语音功能暂时不可用"
+      "value": "⚠️ ネットワークが切断されました。音声機能は一時的に利用できません"
     },
     {
       "name": "voice_offline_queued",
-      "value": "⚠️ 已离线，语音将稍后处理"
+      "value": "⚠️ オフラインです。音声は後で処理されます"
     },
     {
       "name": "voice_offline_tts_queued",
-      "value": "⚠️ 已离线，语音播报将稍后执行"
+      "value": "⚠️ オフラインです。音声再生は後で実行されます"
     },
     {
       "name": "voice_recording_failed",
-      "value": "启动录音失败，请检查麦克风权限"
+      "value": "録音の開始に失敗しました。マイクの許可を確認してください"
     },
     {
       "name": "voice_recording_empty",
-      "value": "录音数据为空"
+      "value": "録音データが空です"
     },
     {
       "name": "voice_stop_failed",
-      "value": "停止录音失败"
+      "value": "録音の停止に失敗しました"
     },
     {
       "name": "voice_stt_failed",
-      "value": "语音识别失败"
+      "value": "音声認識に失敗しました"
     },
     {
       "name": "voice_offline_stt_failed",
-      "value": "离线队列语音识别失败"
+      "value": "オフラインキューの音声認識に失敗しました"
     },
     {
       "name": "voice_tts_failed",
-      "value": "语音播报失败"
+      "value": "音声再生に失敗しました"
     },
     {
       "name": "error_prefix",
-      "value": "错误"
+      "value": "エラー"
     },
     {
       "name": "error_unknown",
-      "value": "未知错误"
+      "value": "不明なエラー"
     },
     {
       "name": "degraded_mode",
-      "value": "⚠️ 已降级到本地模式"
+      "value": "⚠️ ローカルモードに切り替わりました"
     },
     {
       "name": "tool_executing",
-      "value": "执行中..."
+      "value": "実行中..."
     },
     {
       "name": "tool_completed",
-      "value": "已完成"
+      "value": "完了"
     },
     {
       "name": "tool_error",
-      "value": "执行出错"
+      "value": "実行エラー"
     },
     {
       "name": "tool_params",
-      "value": "📋 参数"
+      "value": "📋 パラメータ"
     },
     {
       "name": "tool_result",
-      "value": "📝 执行结果"
+      "value": "📝 実行結果"
     },
     {
       "name": "tool_error_result",
-      "value": "❌ 错误结果"
+      "value": "❌ エラー結果"
     },
     {
       "name": "tool_more_items",
-      "value": "个"
+      "value": "個"
     }
   ]
 }

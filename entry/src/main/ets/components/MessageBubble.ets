@@ -1,5 +1,6 @@
-// MessageBubble.ets — 消息气泡组件（集成语音播报按钮）
+// MessageBubble.ets — 消息气泡组件（集成语音播报按钮 + 深色模式）
 import { ChatMessage, SendStatus } from '../common/ChatTypes';
+import { tc } from '../common/DarkModeManager';
 
 @Component
 export struct MessageBubble {
@@ -33,10 +34,10 @@ export struct MessageBubble {
           Rectangle()
             .width(3)
             .height('100%')
-            .color('#4A90D9')
+            .color(tc('color_quote_bar'))
           Text(this.message.quotedText)
             .fontSize(12)
-            .fontColor('#888888')
+            .fontColor(tc('color_quote_text'))
             .maxLines(2)
             .textOverflow({ overflow: TextOverflow.Ellipsis })
             .margin({ left: 8 })
@@ -57,21 +58,21 @@ export struct MessageBubble {
           if (this.message.quotedText) {
             Text(this.message.isUser ? '回复助手' : '回复你')
               .fontSize(11)
-              .fontColor('#4A90D9')
+              .fontColor(tc('color_accent'))
               .fontWeight(FontWeight.Bold)
               .margin({ bottom: 2 })
           }
 
           Text(this.message.text)
             .fontSize(15)
-            .fontColor(this.message.isUser ? '#FFFFFF' : '#1A1A1A')
+            .fontColor(this.message.isUser ? tc('color_bubble_user_text') : tc('color_bubble_assistant_text'))
             .padding({ top: 8, bottom: 8, left: 12, right: 12 })
 
           // Timestamp + status + voice button
           Row() {
             Text(this.formatTime(this.message.createdAt))
               .fontSize(11)
-              .fontColor(this.message.isUser ? 'rgba(255,255,255,0.7)' : '#999999')
+              .fontColor(this.message.isUser ? tc('color_bubble_user_time') : tc('color_bubble_assistant_time'))
 
             if (this.message.sendStatus !== SendStatus.NONE) {
               Text(this.getStatusIcon())
@@ -82,7 +83,7 @@ export struct MessageBubble {
               if (this.message.sendStatus === SendStatus.FAILED) {
                 Text('重试')
                   .fontSize(11)
-                  .fontColor('#FF4444')
+                  .fontColor(tc('color_error'))
                   .margin({ left: 8 })
                   .onClick(() => this.onRetry())
               }
@@ -91,7 +92,7 @@ export struct MessageBubble {
             if (this.message.isDegraded) {
               Text('离线')
                 .fontSize(10)
-                .fontColor('#FF9800')
+                .fontColor(tc('color_warning'))
                 .margin({ left: 4 })
             }
 
@@ -109,7 +110,7 @@ export struct MessageBubble {
           .width('100%')
         }
         .width('70%')
-        .backgroundColor(this.message.isUser ? '#4A90D9' : '#F0F0F0')
+        .backgroundColor(this.message.isUser ? tc('color_bubble_user') : tc('color_bubble_assistant'))
         .borderRadius(16)
         .margin({
           left: this.message.isUser ? 40 : 0,
@@ -130,7 +131,7 @@ export struct MessageBubble {
       if (!this.message.isUser && this.message.sendStatus === SendStatus.NONE && this.message.text.startsWith('⚠️') || this.message.text.startsWith('错误')) {
         Text(this.message.text)
           .fontSize(13)
-          .fontColor('#FF9800')
+          .fontColor(tc('color_warning'))
           .textAlign(TextAlign.Center)
           .width('100%')
           .margin({ top: 4, bottom: 4 })
