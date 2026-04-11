@@ -1,7 +1,24 @@
 // LLMClient.ets — LLM API 客户端（SSE streaming + tool use + thinking）
 // 对齐 iOS OpenAIClient + Android OpenAIClient
 import { http } from '@kit.NetworkKit';
-import { ConversationMessage, ToolCall } from '../common/ChatTypes';
+import { util } from '@kit.ArkTS';
+import { ChatMessage, MessageType } from '../common/ChatTypes';
+
+// ─── Conversation types (for LLM API) ─────────────────────
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  arguments: string;
+}
+
+export interface ConversationMessage {
+  role: string;
+  content: string;
+  toolCalls?: ToolCall[];
+  toolCallId?: string;
+  name?: string;
+}
 
 // ─── Config ───────────────────────────────────────────────
 
@@ -14,13 +31,15 @@ export interface LLMConfig {
   tools?: ToolDefinition[];
 }
 
+interface ToolFunctionDef {
+  name: string;
+  description: string;
+  parameters: Record<string, Object>;
+}
+
 export interface ToolDefinition {
   type: string;
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, Object>;
-  };
+  function: ToolFunctionDef;
 }
 
 const DEFAULT_CONFIG: LLMConfig = {
@@ -33,14 +52,16 @@ const DEFAULT_CONFIG: LLMConfig = {
 
 // ─── Streaming event types ────────────────────────────────
 
+interface StreamFunctionDelta {
+  name?: string;
+  arguments?: string;
+}
+
 export interface StreamToolCallDelta {
   index: number;
   id?: string;
   type?: string;
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
+  function?: StreamFunctionDelta;
 }
 
 export interface SSEStreamEvent {
@@ -67,7 +88,57 @@ export interface LLMResponse {
   error?: string;
 }
 
+// ─── Non-streaming response interfaces ────────────────────
+
+interface ParsedSSEError {
+  message: string;
+}
+
+interface ParsedToolCallFunc {
+  name: string;
+  arguments: string;
+}
+
+interface ParsedToolCall {
+  id: string;
+  function: ParsedToolCallFunc;
+}
+
+interface ParsedMessage {
+  content: string;
+  reasoning?: string;
+  reasoning_content?: string;
+  tool_calls?: ParsedToolCall[];
+}
+
+interface ParsedChoice {
+  message: ParsedMessage;
+  finish_reason?: string;
+}
+
+interface ParsedCompletionResponse {
+  error?: ParsedSSEError;
+  choices?: ParsedChoice[];
+}
+
 // ─── SSE parser ───────────────────────────────────────────
+
+interface ParsedSSEDelta {
+  content?: string;
+  reasoning?: string;
+  reasoning_content?: string;
+  tool_calls?: StreamToolCallDelta[];
+}
+
+interface ParsedSSEChoice {
+  delta?: ParsedSSEDelta;
+  finish_reason?: string;
+}
+
+interface ParsedSSEResponse {
+  error?: ParsedSSEError;
+  choices?: ParsedSSEChoice[];
+}
 
 class SSEParser {
   private buffer: string = '';
@@ -131,27 +202,27 @@ class SSEParser {
     }
 
     try {
-      const json = JSON.parse(data);
+      const json: ParsedSSEResponse = JSON.parse(data) as ParsedSSEResponse;
 
       // Handle error responses
       if (json.error) {
         return { type: 'error', content: json.error.message || 'Unknown error' };
       }
 
-      const choices = json.choices;
-      if (!choices || choices.length === 0) {
+      const choices: ParsedSSEChoice[] = json.choices || [];
+      if (choices.length === 0) {
         return null;
       }
 
-      const choice = choices[0];
-      const delta = choice.delta;
+      const choice: ParsedSSEChoice = choices[0];
+      const delta: ParsedSSEDelta | undefined = choice.delta;
       if (!delta) {
         return null;
       }
 
       // Thinking / reasoning content (Claude-style or extended models)
       if (delta.reasoning || delta.reasoning_content) {
-        const thinkingText = (delta.reasoning || delta.reasoning_content) as string;
+        const thinkingText: string = delta.reasoning || delta.reasoning_content || '';
         return { type: 'thinking', content: thinkingText };
       }
 
@@ -160,18 +231,18 @@ class SSEParser {
         return {
           type: 'tool_use',
           content: '',
-          toolCalls: delta.tool_calls as StreamToolCallDelta[]
+          toolCalls: delta.tool_calls
         };
       }
 
       // Regular content
       if (delta.content) {
-        return { type: 'content', content: delta.content as string };
+        return { type: 'content', content: delta.content };
       }
 
       // Finish reason
       if (choice.finish_reason) {
-        return { type: 'done', content: '', finishReason: choice.finish_reason as string };
+        return { type: 'done', content: '', finishReason: choice.finish_reason };
       }
 
       return null;
@@ -196,12 +267,36 @@ export class LLMClient {
   private config: LLMConfig;
   private abortController: (() => void) | null = null;
 
-  constructor(config?: Partial<LLMConfig>) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+  constructor(config?: LLMConfig) {
+    if (config) {
+      this.config = {
+        baseURL: config.baseURL || DEFAULT_CONFIG.baseURL,
+        apiKey: config.apiKey || DEFAULT_CONFIG.apiKey,
+        model: config.model || DEFAULT_CONFIG.model,
+        maxTokens: config.maxTokens || DEFAULT_CONFIG.maxTokens,
+        temperature: config.temperature || DEFAULT_CONFIG.temperature,
+        tools: config.tools
+      };
+    } else {
+      this.config = {
+        baseURL: DEFAULT_CONFIG.baseURL,
+        apiKey: DEFAULT_CONFIG.apiKey,
+        model: DEFAULT_CONFIG.model,
+        maxTokens: DEFAULT_CONFIG.maxTokens,
+        temperature: DEFAULT_CONFIG.temperature
+      };
+    }
   }
 
-  updateConfig(config: Partial<LLMConfig>): void {
-    this.config = { ...this.config, ...config };
+  updateConfig(config: LLMConfig): void {
+    this.config = {
+      baseURL: config.baseURL || this.config.baseURL,
+      apiKey: config.apiKey || this.config.apiKey,
+      model: config.model || this.config.model,
+      maxTokens: config.maxTokens || this.config.maxTokens,
+      temperature: config.temperature || this.config.temperature,
+      tools: config.tools !== undefined ? config.tools : this.config.tools
+    };
   }
 
   setTools(tools: ToolDefinition[]): void {
@@ -270,11 +365,15 @@ export class LLMClient {
 
           let toolCalls: ToolCall[] | undefined;
           if (message.tool_calls && message.tool_calls.length > 0) {
-            toolCalls = message.tool_calls.map((tc: any) => ({
-              id: tc.id,
-              name: tc.function.name,
-              arguments: tc.function.arguments
-            }));
+            toolCalls = [];
+            for (let ti = 0; ti < message.tool_calls.length; ti++) {
+              const tc = message.tool_calls[ti];
+              toolCalls.push({
+                id: tc.id,
+                name: tc.function.name,
+                arguments: tc.function.arguments
+              });
+            }
           }
 
           callback({
@@ -360,7 +459,8 @@ export class LLMClient {
       streamResponse.onData((chunk: ArrayBuffer) => {
         if (isAborted) return;
         try {
-          const raw = String.fromArrayBuffer(chunk);
+          const textDecoder = new util.TextDecoder('utf-8');
+          const raw = textDecoder.decode(chunk);
           const events = sseParser.addData(raw);
           this.processEvents(events, partialToolCalls, callbacks);
         } catch (e) {
@@ -378,8 +478,13 @@ export class LLMClient {
         // If tool calls were accumulated, send them
         if (partialToolCalls.size > 0) {
           const toolCalls: ToolCall[] = [];
-          const sortedIndices = Array.from(partialToolCalls.keys()).sort((a, b) => a - b);
-          for (const idx of sortedIndices) {
+          const keys: number[] = [];
+          partialToolCalls.forEach((value: PartialToolCall, key: number) => {
+            keys.push(key);
+          });
+          keys.sort((a: number, b: number): number => a - b);
+          for (let ki = 0; ki < keys.length; ki++) {
+            const idx = keys[ki];
             const ptc = partialToolCalls.get(idx);
             if (ptc) {
               toolCalls.push({
@@ -397,7 +502,7 @@ export class LLMClient {
       });
 
       // Error handler
-      streamResponse.onError((err: Object) => {
+      streamResponse.onError((err: Error) => {
         if (isAborted) return;
         console.error('[LLMClient] stream data error:', JSON.stringify(err));
         callbacks.onError('流式传输中断');
@@ -433,8 +538,13 @@ export class LLMClient {
           if (event.finishReason === 'tool_calls') {
             // Collect all accumulated tool calls
             const toolCalls: ToolCall[] = [];
-            const sortedIndices = Array.from(partialToolCalls.keys()).sort((a, b) => a - b);
-            for (const idx of sortedIndices) {
+            const doneKeys: number[] = [];
+            partialToolCalls.forEach((value: PartialToolCall, key: number) => {
+              doneKeys.push(key);
+            });
+            doneKeys.sort((a: number, b: number): number => a - b);
+            for (let ki = 0; ki < doneKeys.length; ki++) {
+              const idx = doneKeys[ki];
               const ptc = partialToolCalls.get(idx);
               if (ptc) {
                 toolCalls.push({
@@ -530,13 +640,14 @@ export class MockLLMClient {
   }
 
   sendMessage(prompt: string, callback: (response: LLMResponse) => void): void {
+    const delay: number = 800 + Math.floor(Math.random() * 500);
     this.timerId = setTimeout(() => {
       callback({
         success: true,
         content: `这是模拟回复。你发送了：「${prompt}」\n\nAI 助手正在处理你的请求。当前为离线模拟模式。`
       });
       this.timerId = 0;
-    }, 800 + Math.random() * 500) as unknown as number;
+    }, delay);
   }
 
   // Mock streaming: simulates token-by-token output
@@ -546,14 +657,18 @@ export class MockLLMClient {
   ): void {
     const fullText = `这是模拟的流式回复。你发送了：「${prompt}」\n\nAI 助手正在逐字输出，模拟流式传输效果。每个字之间有间隔。`;
     let index = 0;
-    const chars = Array.from(fullText);
+    const chars: string[] = [];
+    for (let ci = 0; ci < fullText.length; ci++) {
+      chars.push(fullText.charAt(ci));
+    }
 
     const sendNext = () => {
       if (index < chars.length) {
         callbacks.onContent(chars[index]);
         index++;
         // Random delay between 30-80ms
-        this.timerId = setTimeout(sendNext, 30 + Math.random() * 50) as unknown as number;
+        const nextDelay: number = 30 + Math.floor(Math.random() * 50);
+        this.timerId = setTimeout(sendNext, nextDelay);
       } else {
         callbacks.onComplete('stop');
         this.timerId = 0;
@@ -561,7 +676,7 @@ export class MockLLMClient {
     };
 
     // Start after initial delay
-    this.timerId = setTimeout(sendNext, 500) as unknown as number;
+    this.timerId = setTimeout(sendNext, 500);
   }
 }
 
@@ -569,8 +684,8 @@ export class MockLLMClient {
 
 interface HttpStreamResponse {
   responseCode: number;
-  header: Object;
+  header: Record<string, string>;
   onData: (callback: (chunk: ArrayBuffer) => void) => void;
   onEnd: (callback: () => void) => void;
-  onError: (callback: (err: Object) => void) => void;
+  onError: (callback: (err: Error) => void) => void;
 }

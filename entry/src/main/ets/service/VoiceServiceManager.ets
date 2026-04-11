@@ -152,7 +152,7 @@ export class VoiceServiceManager {
         streamInfo: {
           samplingRate: audio.AudioSamplingRate.SAMPLE_RATE_16000,
           channels: audio.AudioChannel.CHANNEL_1,
-          sampleFormat: audio.AudioSampleFormat.SAMPLE_S16LE,
+          sampleFormat: audio.AudioSampleFormat.SAMPLE_FORMAT_S16LE,
           encodingType: audio.AudioEncodingType.ENCODING_TYPE_RAW
         },
         capturerInfo: {
@@ -355,7 +355,7 @@ export class VoiceServiceManager {
 
     console.info('[VoiceServiceManager] processing offline queue, length:', this.offlineQueue.length);
 
-    const queue = [...this.offlineQueue];
+    const queue: QueuedVoiceTask[] = this.offlineQueue.slice();
     this.offlineQueue = [];
 
     for (const task of queue) {

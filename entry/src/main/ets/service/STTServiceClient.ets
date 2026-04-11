@@ -1,6 +1,7 @@
 // STTServiceClient.ets — 语音转文字客户端（上传音频获取文字）
 import { http } from '@kit.NetworkKit';
 import { fileIo } from '@kit.CoreFileKit';
+import { util } from '@kit.ArkTS';
 
 const STT_BASE_URL = 'http://localhost:7700';
 
@@ -34,7 +35,7 @@ export class STTServiceClient {
       fileIo.closeSync(file.fd);
 
       this._uploadAudio(arrayBuffer, callback);
-    }).catch((err: any) => {
+    }).catch((err: Error) => {
       console.error('[STTServiceClient] read file error:', JSON.stringify(err));
       callback({ success: false, text: '', error: '读取音频文件失败' });
     });
@@ -118,7 +119,7 @@ export class STTServiceClient {
 
   private _stringToArrayBuffer(str: string): ArrayBuffer {
     const encoder = new util.TextEncoder();
-    const uint8Array = encoder.encodeInto(str);
-    return uint8Array.buffer;
+    const uint8Array: Uint8Array = encoder.encode(str);
+    return uint8Array.buffer as ArrayBuffer;
   }
 }

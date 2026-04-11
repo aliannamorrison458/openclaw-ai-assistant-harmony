@@ -1,5 +1,23 @@
 // NetworkMonitor.ets — 网络状态监测（弱网/离线处理扩展）
-import { netConnection } from '@kit.NetworkKit';
+import { connection } from '@kit.NetworkKit';
+
+interface NetBlockStatusData {
+  netBlocked: boolean;
+}
+
+interface NetCapabilitiesData {
+  linkUpBandwidth: number;
+}
+
+interface NetAvailableData {
+  netCapabilities: NetCapabilitiesData;
+}
+
+interface NetConnection {
+  register(callback: (error: Error | null) => void): void;
+  unregister(callback: () => void): void;
+  on(type: string, callback: (data?: NetAvailableData | NetBlockStatusData) => void): void;
+}
 
 export enum ConnectionType {
   NONE = 'none',
@@ -19,7 +37,7 @@ export class NetworkMonitor {
   private _isConnected: boolean = true;
   private _connectionType: ConnectionType = ConnectionType.UNKNOWN;
   private _networkQuality: NetworkQuality = NetworkQuality.GOOD;
-  private _netConn: any = null;
+  private _netConn: NetConnection | null = null;
   private _listeners: Array<(connected: boolean, type: ConnectionType, quality: NetworkQuality) => void> = [];
   private _qualityListeners: Array<(quality: NetworkQuality) => void> = [];
 
@@ -83,8 +101,8 @@ export class NetworkMonitor {
 
   start(): void {
     try {
-      this._netConn = netConnection.createNetConnection();
-      this._netConn.register((error: any) => {
+      this._netConn = connection.createNetConnection();
+      this._netConn.register((error: Error | null) => {
         if (error) {
           console.error('[NetworkMonitor] register error:', JSON.stringify(error));
           return;
@@ -92,10 +110,12 @@ export class NetworkMonitor {
         console.info('[NetworkMonitor] registered');
       });
 
-      this._netConn.on('netAvailable', (data: any) => {
+      this._netConn.on('netAvailable', (data?: NetAvailableData | NetBlockStatusData) => {
         this._isConnected = true;
-        this._updateConnectionType(data);
-        this._updateNetworkQuality(data);
+        if (data) {
+          this._updateConnectionType(data as NetAvailableData);
+          this._updateNetworkQuality(data as NetAvailableData);
+        }
         this._notifyListeners();
       });
 
@@ -106,9 +126,10 @@ export class NetworkMonitor {
         this._notifyListeners();
       });
 
-      this._netConn.on('netBlockStatusChange', (data: any) => {
+      this._netConn.on('netBlockStatusChange', (data?: NetAvailableData | NetBlockStatusData) => {
         console.info('[NetworkMonitor] block status:', JSON.stringify(data));
-        if (data && data.netBlocked) {
+        const blockData = data as NetBlockStatusData;
+        if (blockData && blockData.netBlocked) {
           this._networkQuality = NetworkQuality.OFFLINE;
           this._notifyListeners();
         }
@@ -181,7 +202,7 @@ export class NetworkMonitor {
     return { available: true, reason: '' };
   }
 
-  private _updateConnectionType(data: any): void {
+  private _updateConnectionType(data: NetAvailableData): void {
     if (data && data.netCapabilities) {
       const caps = data.netCapabilities;
       if (caps.linkUpBandwidth && caps.linkUpBandwidth > 0) {
@@ -192,7 +213,7 @@ export class NetworkMonitor {
     }
   }
 
-  private _updateNetworkQuality(data: any): void {
+  private _updateNetworkQuality(data: NetAvailableData): void {
     if (!this._isConnected) {
       this._networkQuality = NetworkQuality.OFFLINE;
       return;

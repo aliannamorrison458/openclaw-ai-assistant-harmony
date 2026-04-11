@@ -130,7 +130,7 @@ export class TTSClient {
       this.audioPlayer = player;
 
       // 状态变化监听
-      player.on('stateChange', (state: string, reason: any) => {
+      player.on('stateChange', (state: string, reason: Error) => {
         console.info('[TTSClient] player state:', state);
         switch (state) {
           case 'initialized':
@@ -163,8 +163,9 @@ export class TTSClient {
         }
       });
 
-      // 设置播放源
-      player.fdSrc = filePath;
+      // 设置播放源 — fdSrc 需要 AVFileDescriptor
+      const audioFd = fileIo.openSync(filePath, fileIo.OpenMode.READ_ONLY);
+      player.fdSrc = { fd: audioFd.fd, offset: 0, length: 0 };
     } catch (e) {
       console.error('[TTSClient] create player error:', JSON.stringify(e));
       callback?.({ success: false, error: '创建播放器失败' });
