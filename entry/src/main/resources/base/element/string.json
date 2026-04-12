@@ -255,6 +255,14 @@
     {
       "name": "tool_more_items",
       "value": "个"
+    },
+    {
+      "name": "widget_display_name",
+      "value": "AI 助手快捷输入"
+    },
+    {
+      "name": "widget_description",
+      "value": "在桌面快速输入并发送消息给 AI 助手"
     }
   ]
 }

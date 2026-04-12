@@ -1,0 +1,28 @@
+{
+  "forms": [
+    {
+      "name": "WidgetCard",
+      "displayName": "$string:widget_display_name",
+      "description": "$string:widget_description",
+      "src": "./ets/widget/WidgetCard.ets",
+      "uiSyntax": "arkts",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "isDefault": true,
+      "scheduledUpdateTime": "10:30",
+      "updateEnabled": false,
+      "defaultDimension": "2*4",
+      "supportDimensions": ["2*4"],
+      "metaData": {
+        "customizeData": [
+          {
+            "name": "formKitSupportAbility",
+            "value": "EntryAbility"
+          }
+        ]
+      }
+    }
+  ]
+}
