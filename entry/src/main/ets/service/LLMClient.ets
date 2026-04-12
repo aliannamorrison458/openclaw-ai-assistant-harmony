@@ -26,8 +26,8 @@ export interface LLMConfig {
   baseURL: string;
   apiKey: string;
   model: string;
-  maxTokens: number;
-  temperature: number;
+  maxTokens?: number;
+  temperature?: number;
   tools?: ToolDefinition[];
 }
 
