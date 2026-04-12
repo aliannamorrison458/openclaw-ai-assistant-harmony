@@ -1,6 +1,7 @@
 {
   "src": [
     "pages/Index",
+    "pages/OnboardingPage",
     "pages/SessionListPage",
     "pages/SettingsPage"
   ]
