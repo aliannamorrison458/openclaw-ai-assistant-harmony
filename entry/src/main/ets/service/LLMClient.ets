@@ -75,9 +75,97 @@ export interface SSEStreamEvent {
 export interface LLMStreamCallbacks {
   onContent: (chunk: string) => void;
   onThinking: (chunk: string) => void;
-  onToolCall: (toolCalls: ToolCall[]) => void;
+  onToolCall: (toolCalls: ToolCallInfo[]) => void;
   onComplete: (finishReason: string) => void;
   onError: (error: string) => void;
+}
+
+export class ToolCallInfo {
+  name: string = '';
+  arguments: string = '';
+  id: string = '';
+}
+
+export class SendMessageResponse {
+  success: boolean = false;
+  content: string = '';
+  thinking?: string;
+  error?: string;
+}
+
+// Request body class for ArkTS strict mode
+export class ChatRequestBody {
+  model: string = '';
+  messages: ConversationMessage[] = [];
+  stream: boolean = false;
+  max_tokens?: number;
+  temperature?: number;
+  tools?: Object[];
+}
+
+// Response parsed from JSON
+export interface ChatChoice {
+  message: ChatResponseMessage;
+  index?: number;
+  finish_reason?: string;
+}
+
+export interface ChatResponseMessage {
+  content: string;
+  reasoning?: string;
+  reasoning_content?: string;
+  tool_calls?: ChatToolCall[];
+}
+
+export interface ChatToolCall {
+  id: string;
+  function: ChatToolCallFunc;
+  type?: string;
+}
+
+export interface ChatToolCallFunc {
+  name: string;
+  arguments: string;
+}
+
+export interface ChatApiResponse {
+  choices?: ChatChoice[];
+  error?: ChatApiError;
+}
+
+export interface ChatApiError {
+  message: string;
+  type?: string;
+  code?: string;
+}
+
+// SSE stream parsed delta
+export interface StreamDelta {
+  role?: string;
+  content?: string;
+  reasoning?: string;
+  reasoning_content?: string;
+  tool_calls?: ChatToolCall[];
+}
+
+export interface StreamChoice {
+  delta: StreamDelta;
+  index?: number;
+  finish_reason?: string;
+}
+
+export interface StreamChunk {
+  choices?: StreamChoice[];
+  error?: ChatApiError;
+}
+
+// Interface for buildConversationHistory input
+export interface ConversationInput {
+  role: string;
+  content: string;
+  toolCalls?: ToolCall[];
+  toolCallId?: string;
+  name?: string;
 }
 
 export interface LLMResponse {
@@ -328,7 +416,7 @@ export class LLMClient {
     }
     messages.push({ role: 'user', content: prompt });
 
-    const bodyObj: Record<string, Object> = {
+    const bodyObj: ChatRequestBody = {
       model: this.config.model,
       messages: messages,
       stream: false,
@@ -337,7 +425,7 @@ export class LLMClient {
     };
 
     if (this.config.tools && this.config.tools.length > 0) {
-      bodyObj['tools'] = this.config.tools;
+      bodyObj.tools = this.config.tools;
     }
 
     const body = JSON.stringify(bodyObj);
@@ -352,24 +440,25 @@ export class LLMClient {
       expectDataType: http.HttpDataType.STRING,
       connectTimeout: 10000,
       readTimeout: 60000
-    }, (err, data) => {
+    }, (err: Error | undefined, data: http.HttpResponse) => {
       if (err) {
         console.error('[LLMClient] request error:', JSON.stringify(err));
-        callback({ success: false, content: '', error: `网络请求失败: ${err.code}` });
+        callback({ success: false, content: '', error: `网络请求失败: ${err}` });
         return;
       }
 
       try {
-        const result = JSON.parse(data.result as string);
+        const rawResult: Object = JSON.parse(data.result as string);
+        const result: ChatApiResponse = rawResult as ChatApiResponse;
         if (result.choices && result.choices.length > 0) {
-          const choice = result.choices[0];
-          const message = choice.message;
+          const choice: ChatChoice = result.choices[0];
+          const message: ChatResponseMessage = choice.message;
 
           let toolCalls: ToolCall[] | undefined;
           if (message.tool_calls && message.tool_calls.length > 0) {
             toolCalls = [];
             for (let ti = 0; ti < message.tool_calls.length; ti++) {
-              const tc = message.tool_calls[ti];
+              const tc: ChatToolCall = message.tool_calls[ti];
               toolCalls.push({
                 id: tc.id,
                 name: tc.function.name,
@@ -421,7 +510,7 @@ export class LLMClient {
       finalMessages.push(messages[mi]);
     }
 
-    const bodyObj: Record<string, Object> = {
+    const bodyObj: ChatRequestBody = {
       model: this.config.model,
       messages: finalMessages,
       stream: true,
@@ -430,7 +519,7 @@ export class LLMClient {
     };
 
     if (this.config.tools && this.config.tools.length > 0) {
-      bodyObj['tools'] = this.config.tools;
+      bodyObj.tools = this.config.tools;
     }
 
     const body = JSON.stringify(bodyObj);
@@ -454,73 +543,64 @@ export class LLMClient {
       extraData: body,
       connectTimeout: 10000,
       readTimeout: 120000
-    }, (err, data) => {
-      if (isAborted) return;
-
+    }, (err: Error | undefined, statusCode: number) => {
       if (err) {
-        console.error('[LLMClient] stream error:', JSON.stringify(err));
-        callbacks.onError(`网络请求失败: ${err.code}`);
+        console.error('[LLMClient] stream request error:', JSON.stringify(err));
+        callbacks.onError(`网络请求失败: ${err}`);
         this.abortController = null;
+        httpRequest.destroy();
         return;
       }
-
-      // data is the HttpStreamResponse
-      const streamResponse = data as HttpStreamResponse;
-
-      // Data received handler
-      streamResponse.onData((chunk: ArrayBuffer) => {
-        if (isAborted) return;
-        try {
-          const textDecoder = new util.TextDecoder('utf-8');
-          const raw = textDecoder.decode(chunk);
-          const events = sseParser.addData(raw);
-          this.processEvents(events, partialToolCalls, callbacks);
-        } catch (e) {
-          console.error('[LLMClient] chunk decode error');
-        }
-      });
-
-      // Stream complete handler
-      streamResponse.onEnd(() => {
-        if (isAborted) return;
-        // Flush remaining buffer
-        const remaining = sseParser.flush();
-        this.processEvents(remaining, partialToolCalls, callbacks);
-
-        // If tool calls were accumulated, send them
-        if (partialToolCalls.size > 0) {
-          const toolCalls: ToolCall[] = [];
-          const keys: number[] = [];
-          partialToolCalls.forEach((value: PartialToolCall, key: number) => {
-            keys.push(key);
-          });
-          keys.sort((a: number, b: number): number => a - b);
-          for (let ki = 0; ki < keys.length; ki++) {
-            const idx = keys[ki];
-            const ptc = partialToolCalls.get(idx);
-            if (ptc) {
-              toolCalls.push({
-                id: ptc.id,
-                name: ptc.name,
-                arguments: ptc.arguments
-              });
-            }
-          }
-          callbacks.onToolCall(toolCalls);
-        }
-
-        callbacks.onComplete('stop');
-        this.abortController = null;
-      });
-
-      // Error handler
-      streamResponse.onError((err: Error) => {
-        if (isAborted) return;
-        console.error('[LLMClient] stream data error:', JSON.stringify(err));
-        callbacks.onError('流式传输中断');
-        this.abortController = null;
-      });
+      console.info('[LLMClient] stream started, status:', statusCode);
     });
+
+    // Event-based streaming handlers (HarmonyOS NetworkKit API)
+    httpRequest.on('dataReceive', (data: ArrayBuffer) => {
+      if (isAborted) return;
+      try {
+        const textDecoder = new util.TextDecoder('utf-8');
+        const raw = textDecoder.decode(new Uint8Array(data));
+        const events = sseParser.addData(raw);
+        this.processEvents(events, partialToolCalls, callbacks);
+      } catch (e) {
+        console.error('[LLMClient] chunk decode error');
+      }
+    });
+
+    httpRequest.on('dataEnd', () => {
+      if (isAborted) return;
+      // Flush remaining buffer
+      const remaining = sseParser.flush();
+      this.processEvents(remaining, partialToolCalls, callbacks);
+
+      // If tool calls were accumulated, send them
+      if (partialToolCalls.size > 0) {
+        const toolCalls: ToolCall[] = [];
+        const keys: number[] = [];
+        partialToolCalls.forEach((value: PartialToolCall, key: number) => {
+          keys.push(key);
+        });
+        keys.sort((a: number, b: number): number => a - b);
+        for (let ki = 0; ki < keys.length; ki++) {
+          const idx = keys[ki];
+          const ptc = partialToolCalls.get(idx);
+          if (ptc) {
+            toolCalls.push({
+              id: ptc.id,
+              name: ptc.name,
+              arguments: ptc.arguments
+            });
+          }
+        }
+        callbacks.onToolCall(toolCalls);
+      }
+
+      callbacks.onComplete('stop');
+      this.abortController = null;
+      httpRequest.destroy();
+    });
+
+    httpRequest.destroy();
   }
 
   // ─── Process parsed SSE events ──────────────────────────
@@ -615,7 +695,7 @@ export class LLMClient {
   // ─── Build conversation messages from ChatMessage ───────
 
   static buildConversationHistory(
-    messages: Array<{ role: string; content: string; toolCalls?: ToolCall[]; toolCallId?: string; name?: string }>
+    messages: ConversationInput[]
   ): ConversationMessage[] {
     const result: ConversationMessage[] = [];
     for (let i = 0; i < messages.length; i++) {

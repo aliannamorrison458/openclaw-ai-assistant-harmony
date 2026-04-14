@@ -103,7 +103,7 @@ export class TTSClient {
 
   private _playAudioBuffer(buffer: ArrayBuffer, callback?: (result: TTSResult) => void): void {
     // 写入临时文件
-    const cacheDir = globalThis.context?.cacheDir || '/data/storage/el2/base/cache';
+    const cacheDir: string = globalThis.context.cacheDir || '/data/storage/el2/base/cache';
     const tempPath = `${cacheDir}/tts_${Date.now()}.wav`;
 
     try {
@@ -129,10 +129,18 @@ export class TTSClient {
       const player = await media.createAVPlayer();
       this.audioPlayer = player;
 
-      // 状态变化监听
-      player.on('stateChange', (state: string, reason: Error) => {
-        console.info('[TTSClient] player state:', state);
-        switch (state) {
+      player.prepare((err: Error | undefined) => {
+        if (err) {
+          console.error('[TTSClient] prepare error:', JSON.stringify(err));
+          callback?.({ success: false, error: '播放器初始化失败' });
+          return;
+        }
+      });
+
+      // Use AVPlayerState for state tracking
+      const checkState = (): void => {
+        if (!this.audioPlayer) return;
+        switch (player.state) {
           case 'initialized':
             player.prepare();
             break;
@@ -147,12 +155,11 @@ export class TTSClient {
             this._onPlayStateChange?.(false);
             player.release();
             this.audioPlayer = null;
-            // 清理临时文件
             try { fileIo.unlinkSync(filePath); } catch (_) {}
             callback?.({ success: true });
             break;
           case 'error':
-            console.error('[TTSClient] player error:', JSON.stringify(reason));
+            console.error('[TTSClient] player error, state:', player.state);
             this._isPlaying = false;
             this._onPlayStateChange?.(false);
             player.release();
@@ -161,7 +168,17 @@ export class TTSClient {
             callback?.({ success: false, error: '播放失败' });
             break;
         }
-      });
+      };
+
+      // Poll state changes (ArkTS AVPlayer limitation)
+      const stateTimer = setInterval(() => {
+        checkState();
+      }, 200);
+
+      // Set a timeout to clear the timer
+      setTimeout(() => {
+        clearInterval(stateTimer);
+      }, 300000);
 
       // 设置播放源 — fdSrc 需要 AVFileDescriptor
       const audioFd = fileIo.openSync(filePath, fileIo.OpenMode.READ_ONLY);

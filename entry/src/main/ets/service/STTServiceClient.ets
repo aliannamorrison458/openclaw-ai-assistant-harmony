@@ -11,6 +11,11 @@ export interface STTResult {
   error?: string;
 }
 
+interface STTApiResponse {
+  text?: string;
+  error?: string;
+}
+
 export class STTServiceClient {
   private baseURL: string;
 
@@ -100,7 +105,7 @@ export class STTServiceClient {
       }
 
       try {
-        const result = JSON.parse(data.result as string);
+        const result: STTApiResponse = JSON.parse(data.result as string) as STTApiResponse;
         if (result.text) {
           callback({ success: true, text: result.text });
         } else if (result.error) {

@@ -1,24 +1,6 @@
 // NetworkMonitor.ets — 网络状态监测（弱网/离线处理扩展）
 import { connection } from '@kit.NetworkKit';
 
-interface NetBlockStatusData {
-  netBlocked: boolean;
-}
-
-interface NetCapabilitiesData {
-  linkUpBandwidth: number;
-}
-
-interface NetAvailableData {
-  netCapabilities: NetCapabilitiesData;
-}
-
-interface NetConnection {
-  register(callback: (error: Error | null) => void): void;
-  unregister(callback: () => void): void;
-  on(type: string, callback: (data?: NetAvailableData | NetBlockStatusData) => void): void;
-}
-
 export enum ConnectionType {
   NONE = 'none',
   WIFI = 'wifi',
@@ -32,12 +14,17 @@ export enum NetworkQuality {
   OFFLINE = 'offline'    // 离线
 }
 
+export class VoiceAvailability {
+  available: boolean = false;
+  reason: string = '';
+}
+
 export class NetworkMonitor {
   private static instance: NetworkMonitor;
   private _isConnected: boolean = true;
   private _connectionType: ConnectionType = ConnectionType.UNKNOWN;
   private _networkQuality: NetworkQuality = NetworkQuality.GOOD;
-  private _netConn: NetConnection | null = null;
+  private _netConn: connection.NetConnection | null = null;
   private _listeners: Array<(connected: boolean, type: ConnectionType, quality: NetworkQuality) => void> = [];
   private _qualityListeners: Array<(quality: NetworkQuality) => void> = [];
 
@@ -45,6 +32,7 @@ export class NetworkMonitor {
   private _lastCheckTime: number = 0;
   private _consecutiveFailures: number = 0;
   private _weakNetworkThreshold: number = 3; // 连续失败次数判定弱网
+  private _qualityTimer: number = -1;
 
   private constructor() {}
 
@@ -110,12 +98,10 @@ export class NetworkMonitor {
         console.info('[NetworkMonitor] registered');
       });
 
-      this._netConn.on('netAvailable', (data?: NetAvailableData | NetBlockStatusData) => {
+      this._netConn.on('netAvailable', (data: connection.NetHandle) => {
         this._isConnected = true;
-        if (data) {
-          this._updateConnectionType(data as NetAvailableData);
-          this._updateNetworkQuality(data as NetAvailableData);
-        }
+        this._connectionType = ConnectionType.UNKNOWN;
+        this._networkQuality = NetworkQuality.GOOD;
         this._notifyListeners();
       });
 
@@ -126,10 +112,9 @@ export class NetworkMonitor {
         this._notifyListeners();
       });
 
-      this._netConn.on('netBlockStatusChange', (data?: NetAvailableData | NetBlockStatusData) => {
+      this._netConn.on('netBlockStatusChange', (data: connection.NetBlockStatusInfo) => {
         console.info('[NetworkMonitor] block status:', JSON.stringify(data));
-        const blockData = data as NetBlockStatusData;
-        if (blockData && blockData.netBlocked) {
+        if (data && data.blocked) {
           this._networkQuality = NetworkQuality.OFFLINE;
           this._notifyListeners();
         }
@@ -143,6 +128,10 @@ export class NetworkMonitor {
   }
 
   stop(): void {
+    if (this._qualityTimer >= 0) {
+      clearInterval(this._qualityTimer);
+      this._qualityTimer = -1;
+    }
     if (this._netConn) {
       this._netConn.unregister(() => {});
       this._netConn = null;
@@ -192,47 +181,19 @@ export class NetworkMonitor {
   /**
    * 检查语音功能是否可用
    */
-  isVoiceAvailable(): { available: boolean; reason: string } {
+  isVoiceAvailable(): VoiceAvailability {
     if (!this._isConnected) {
-      return { available: false, reason: '网络已断开，语音功能暂时不可用' };
+      return { available: false, reason: '网络已断开，语音功能暂时不可用' } as VoiceAvailability;
     }
     if (this._networkQuality === NetworkQuality.WEAK) {
-      return { available: false, reason: '网络信号较弱，语音功能可能不稳定' };
+      return { available: false, reason: '网络信号较弱，语音功能可能不稳定' } as VoiceAvailability;
     }
-    return { available: true, reason: '' };
-  }
-
-  private _updateConnectionType(data: NetAvailableData): void {
-    if (data && data.netCapabilities) {
-      const caps = data.netCapabilities;
-      if (caps.linkUpBandwidth && caps.linkUpBandwidth > 0) {
-        this._connectionType = caps.linkUpBandwidth > 100 ? ConnectionType.WIFI : ConnectionType.CELLULAR;
-      } else {
-        this._connectionType = ConnectionType.UNKNOWN;
-      }
-    }
-  }
-
-  private _updateNetworkQuality(data: NetAvailableData): void {
-    if (!this._isConnected) {
-      this._networkQuality = NetworkQuality.OFFLINE;
-      return;
-    }
-
-    if (data && data.netCapabilities) {
-      const caps = data.netCapabilities;
-      // 低带宽判断为弱网
-      if (caps.linkUpBandwidth && caps.linkUpBandwidth < 50) {
-        this._networkQuality = NetworkQuality.WEAK;
-      } else {
-        this._networkQuality = NetworkQuality.GOOD;
-      }
-    }
+    return { available: true, reason: '' } as VoiceAvailability;
   }
 
   private _startQualityCheck(): void {
     // 每 30 秒检查一次网络质量
-    setInterval(() => {
+    this._qualityTimer = setInterval(() => {
       if (!this._isConnected) return;
 
       const now = Date.now();

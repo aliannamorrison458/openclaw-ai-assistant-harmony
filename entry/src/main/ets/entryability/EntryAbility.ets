@@ -15,8 +15,8 @@ export default class EntryAbility extends UIAbility {
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
     hilog.info(0x0000, TAG, 'onCreate');
     this.viewModel = new ChatViewModel();
-    // Share viewModel globally for settings page access
-    (globalThis as any).chatViewModel = this.viewModel;
+    // Share viewModel globally for settings page access via AppStorage
+    AppStorage.setOrCreate<ChatViewModel | null>('chatViewModel', this.viewModel);
   }
 
   onDestroy(): void {

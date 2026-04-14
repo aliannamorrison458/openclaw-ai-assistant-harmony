@@ -1,10 +1,23 @@
 // ChatViewModel.ets — 聊天 ViewModel（集成语音功能 + 多会话支持）
 import { ChatMessage, SendStatus, ChatSession, createUserId, createAssistantMessage, createSystemMessage } from '../common/ChatTypes';
-import { LLMClient, MockLLMClient, LLMConfig, ConversationMessage, LLMStreamCallbacks } from '../service/LLMClient';
-import { NetworkMonitor, ConnectionType, NetworkQuality } from '../service/NetworkMonitor';
+import { LLMClient, MockLLMClient, LLMConfig, ConversationMessage, LLMStreamCallbacks, SendMessageResponse, LLMResponse } from '../service/LLMClient';
+import { NetworkMonitor, ConnectionType, NetworkQuality, VoiceAvailability } from '../service/NetworkMonitor';
 import { VoiceServiceManager, VoiceState } from '../service/VoiceServiceManager';
 import { SessionManager } from '../service/SessionManager';
 import { preferences } from '@kit.ArkData';
+
+class ChatCallbackResponse {
+  success: boolean = false;
+  content: string = '';
+  error?: string;
+}
+
+class ChatSettings {
+  baseURL: string = '';
+  apiKey: string = '';
+  useMock: boolean = true;
+  model: string = '';
+}
 
 const PREF_NAME = 'ai_assistant_prefs';
 const KEY_API_BASE = 'api_base_url';
@@ -256,7 +269,7 @@ export class ChatViewModel {
     this._debouncedSaveMessages();
     this._notify();
 
-    const callback = (response: { success: boolean; content: string; thinking?: string; error?: string }) => {
+    const callback = (response: SendMessageResponse) => {
       const idx = this.messages.findIndex(m => m.id === messageId);
       if (idx < 0) return;
 
@@ -315,7 +328,7 @@ export class ChatViewModel {
     this._notify();
 
     if (this.useMock || wasOffline) {
-      const callback = (response: { success: boolean; content: string; error?: string }) => {
+      const callback = (response: ChatCallbackResponse) => {
         const idx = this.messages.findIndex(m => m.id === messageId);
         if (idx < 0) return;
         if (response.success) {
@@ -334,14 +347,15 @@ export class ChatViewModel {
     }
 
     // Build conversation history
-    const convMessages: Array<{ role: string; content: string }> = [];
+    const convMessages: ConversationMessage[] = [];
     for (let i = 0; i < this.messages.length; i++) {
       const m = this.messages[i];
       if (m.messageType === 'system') continue;
-      convMessages.push({
+      const msg: ConversationMessage = {
         role: m.isUser ? 'user' : 'assistant',
         content: m.text
-      });
+      };
+      convMessages.push(msg);
     }
 
     // Create assistant message for streaming accumulation
@@ -448,7 +462,7 @@ export class ChatViewModel {
     this.messages[idx].sendStatus = SendStatus.SENDING;
     this._notify();
 
-    const callback = (response: { success: boolean; content: string; error?: string }) => {
+    const callback = (response: LLMResponse) => {
       if (response.success) {
         this.messages[idx].sendStatus = SendStatus.SENT;
         this.messages.push(createAssistantMessage(response.content));
@@ -495,16 +509,20 @@ export class ChatViewModel {
     }
   }
 
-  async loadSettings(): Promise<{ baseURL: string; apiKey: string; useMock: boolean; model: string }> {
+  async loadSettings(): Promise<ChatSettings> {
     if (!this.prefStore) {
-      return { baseURL: 'https://api.openai.com/v1', apiKey: '', useMock: true, model: 'gpt-3.5-turbo' };
+      const defaults: ChatSettings = {
+        baseURL: 'https://api.openai.com/v1', apiKey: '', useMock: true, model: 'gpt-3.5-turbo'
+      };
+      return defaults;
     }
-    return {
+    const settings: ChatSettings = {
       baseURL: await this.prefStore.get(KEY_API_BASE, 'https://api.openai.com/v1') as string,
       apiKey: await this.prefStore.get(KEY_API_TOKEN, '') as string,
       useMock: await this.prefStore.get(KEY_USE_MOCK, true) as boolean,
       model: await this.prefStore.get(KEY_MODEL, 'gpt-3.5-turbo') as string
     };
+    return settings;
   }
 
   async getSystemPrompt(): Promise<string> {

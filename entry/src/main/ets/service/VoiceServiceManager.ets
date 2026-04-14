@@ -165,7 +165,7 @@ export class VoiceServiceManager {
       this.recordingChunks = [];
 
       // 设置录音路径
-      const cacheDir = globalThis.context?.cacheDir || '/data/storage/el2/base/cache';
+      const cacheDir: string = globalThis.context.cacheDir || '/data/storage/el2/base/cache';
       this.recordingPath = `${cacheDir}/recording_${Date.now()}.pcm`;
 
       // 监听录音数据
