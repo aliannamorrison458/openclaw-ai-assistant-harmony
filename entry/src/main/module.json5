@@ -2,53 +2,35 @@
   "module": {
     "name": "entry",
     "type": "entry",
+    "srcEntry": "./ets/entry.js",
     "description": "$string:module_desc",
     "mainElement": "EntryAbility",
     "deviceTypes": [
-      "phone",
-      "tablet"
+      "phone"
     ],
     "deliveryWithInstall": true,
     "installationFree": false,
-    "pages": "$profile:main_pages",
+    "pages": "$profile:default_pages_config",
     "abilities": [
       {
         "name": "EntryAbility",
-        "srcEntry": "./ets/entryability/EntryAbility.ets",
-        "description": "$string:EntryAbility_desc",
-        "icon": "$media:layered_image",
-        "label": "$string:EntryAbility_label",
-        "startWindowIcon": "$media:startIcon",
+        "srcEntry": "./ets/entry.js",
+        "description": "$string:entry_ability_desc",
+        "icon": "$media:icon",
+        "label": "$string:entry_ability_label",
+        "startWindowImage": "$media:icon",
         "startWindowBackground": "$color:start_window_background",
-        "exported": true,
+        "visible": true,
         "skills": [
           {
+            "actions": [
+              "ohos.want.action.home"
+            ],
             "entities": [
               "entity.system.home"
-            ],
-            "actions": [
-              "action.system.home"
             ]
           }
         ]
-      }
-    ],
-    "requestPermissions": [
-      {
-        "name": "ohos.permission.MICROPHONE",
-        "reason": "$string:permission_microphone_reason",
-        "usedScene": {
-          "abilities": ["EntryAbility"],
-          "when": "always"
-        }
-      },
-      {
-        "name": "ohos.permission.INTERNET",
-        "reason": "$string:permission_internet_reason",
-        "usedScene": {
-          "abilities": ["EntryAbility"],
-          "when": "always"
-        }
       }
     ]
   }
